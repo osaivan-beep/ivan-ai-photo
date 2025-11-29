@@ -2029,7 +2029,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ image, onSave, onClose
     };
 
     const handleUpdateOverlay = useCallback((id: string, updates: Partial<Overlay>) => {
-        setOverlays(prev => prev.map(o => o.id === id ? { ...o, ...updates } : o));
+        setOverlays(prev => prev.map(o => (o.id === id ? ({ ...o, ...updates } as Overlay) : o)));
     }, []);
 
     const handleAddText = () => {
