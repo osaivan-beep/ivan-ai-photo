@@ -286,7 +286,7 @@ const PermissionErrorModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                 The app cannot read/write to the database. This usually means the Firestore Rules are not set correctly.
             </p>
             <ol className="list-decimal list-inside text-gray-400 text-sm mb-4 space-y-2">
-                <li>Go to <a href="https://console.firebase.google.com/" target="_blank" className="text-blue-400 hover:underline">Firebase Console</a> > Firestore Database.</li>
+                <li>Go to <a href="https://console.firebase.google.com/" target="_blank" className="text-blue-400 hover:underline">Firebase Console</a> &gt; Firestore Database.</li>
                 <li>Click the <strong>Rules</strong> tab.</li>
                 <li>Replace the code with this:</li>
             </ol>
