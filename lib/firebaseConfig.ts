@@ -14,7 +14,9 @@ import type { FirebaseConfig } from '../types';
  */
 
 export const embeddedConfig: FirebaseConfig | null = {
-  apiKey: "AIzaSyC0JNw9WC_ZttdDzVnUUW2i_04kvUowQDg",
+  // Firebase Browser Key (用於登入與資料庫 / For Auth & Firestore)
+  // 這必須是 Google Cloud Console 顯示的那組 Browser key
+  apiKey: "AIzaSyC0JNw9WC_ZttdDzVnUUW2i_04kvUowQDg", 
   authDomain: "ivan-ai-photo-web.firebaseapp.com",
   projectId: "ivan-ai-photo-web",
   storageBucket: "ivan-ai-photo-web.firebasestorage.app",
@@ -23,3 +25,13 @@ export const embeddedConfig: FirebaseConfig | null = {
   measurementId: "G-EX29ZPS2ET",
   adminEmail: "osa.ivan@gmail.com"
 };
+
+/**
+ * ============================================================================
+ * 【GEMINI AI KEY】
+ * 
+ * 這是專門用於 AI 生成圖片的 API Key (來自 Google AI Studio)。
+ * This specific key is used for Gemini AI generation calls.
+ * ============================================================================
+ */
+export const geminiApiKey = "AIzaSyCeR52YbrlvyOqk8-cOyTwEVZ9TYRrbdCg";
