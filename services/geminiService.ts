@@ -114,7 +114,7 @@ export const refinePrompt = async (
     if (image) {
          systemInstruction = "You are an expert prompt engineer for AI image editing. I will provide you with an image and a user request. Your task is to analyze the image's subject, style, and composition, and then write a detailed, descriptive prompt that incorporates the user's request into the scene naturally. The output should be a single paragraph description of the final desired image. Output ONLY the refined prompt text.";
     } else {
-         systemInstruction = "You are an expert prompt engineer for AI image generation. Rewrite the following prompt to be more descriptive, detailed, and effective for an AI image generator. Keep the core intent but enhance the artistic style and lighting descriptions. Output ONLY the refined prompt text.";
+         systemInstruction = "You are an expert prompt engineer for AI image generation. Rewrite the user's prompt to be more descriptive, detailed, and effective for an AI image generator. Keep the core intent but enhance the artistic style and lighting descriptions. Output ONLY the refined prompt text without any explanations.";
     }
 
     if (language === 'zh') {
@@ -129,9 +129,9 @@ export const refinePrompt = async (
                 mimeType: image.mimeType
             }
         });
-        contents.push({ text: `User Request: ${prompt}\n\nBased on the attached image and the user request, generate a refined prompt.` });
+        contents.push({ text: `User Request: ${prompt}` });
     } else {
-        contents.push({ text: `${systemInstruction}\n\nOriginal Prompt: ${prompt}` });
+        contents.push({ text: prompt });
     }
 
     const response = await ai.models.generateContent({
@@ -141,7 +141,8 @@ export const refinePrompt = async (
           parts: contents
       },
       config: {
-          systemInstruction: image ? systemInstruction : undefined
+          systemInstruction: systemInstruction,
+          temperature: 0.7 // Increase temperature to allow for more creative rewriting
       }
     });
     return response.text?.trim() || prompt;

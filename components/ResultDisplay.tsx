@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { ApiResult, TFunction } from '../types';
-import { ImageIcon, DownloadIcon, EditIcon } from './Icons';
+import { ImageIcon, DownloadIcon, EditIcon, CompareIcon } from './Icons';
 
 interface ResultDisplayProps {
   loading: boolean;
@@ -8,9 +8,11 @@ interface ResultDisplayProps {
   apiResult: ApiResult;
   t: TFunction;
   onEditResult: () => void;
+  originalImageSrc: string | null;
 }
 
-export const ResultDisplay: React.FC<ResultDisplayProps> = ({ loading, error, apiResult, t, onEditResult }) => {
+export const ResultDisplay: React.FC<ResultDisplayProps> = ({ loading, error, apiResult, t, onEditResult, originalImageSrc }) => {
+  const [isComparing, setIsComparing] = useState(false);
 
   const handleDownload = () => {
     if (!apiResult.imageUrl) return;
@@ -22,6 +24,8 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({ loading, error, ap
     link.click();
     document.body.removeChild(link);
   };
+
+  const currentImageSrc = isComparing && originalImageSrc ? originalImageSrc : apiResult.imageUrl;
 
   return (
     <div className="flex flex-col flex-grow w-full h-full min-h-[400px] justify-center items-center bg-gray-900/50 rounded-lg p-4">
@@ -52,9 +56,33 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({ loading, error, ap
           {apiResult.imageUrl && (
             <div className="flex flex-col items-center gap-4 w-full">
               <div className="relative w-full aspect-square bg-black rounded-lg overflow-hidden">
-                <img src={apiResult.imageUrl} alt="Generated result" className="w-full h-full object-contain" />
+                {currentImageSrc && (
+                   <img 
+                      src={currentImageSrc} 
+                      alt="Generated result" 
+                      className="w-full h-full object-contain" 
+                   />
+                )}
+                {isComparing && originalImageSrc && (
+                    <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded pointer-events-none">
+                        Original
+                    </div>
+                )}
               </div>
               <div className="flex flex-wrap items-center justify-center gap-4">
+                {originalImageSrc && (
+                    <button
+                        onMouseDown={() => setIsComparing(true)}
+                        onMouseUp={() => setIsComparing(false)}
+                        onMouseLeave={() => setIsComparing(false)}
+                        onTouchStart={() => setIsComparing(true)}
+                        onTouchEnd={() => setIsComparing(false)}
+                        className="flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 active:scale-95"
+                    >
+                        <CompareIcon className="w-5 h-5" />
+                        <span>{t('compareButton')}</span>
+                    </button>
+                )}
                 <button
                     onClick={onEditResult}
                     className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-lg transition-all duration-300 transform hover:scale-105"

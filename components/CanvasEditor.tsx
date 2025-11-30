@@ -1,9 +1,11 @@
+
 import React, { useRef, useEffect, useState, useImperativeHandle, forwardRef, useCallback } from 'react';
 
 interface CanvasEditorProps {
   imageSrc: string;
   brushSize: number;
   brushColor: string;
+  enableDrawing?: boolean;
 }
 
 export interface CanvasEditorRef {
@@ -12,11 +14,12 @@ export interface CanvasEditorRef {
 }
 
 export const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
-  ({ imageSrc, brushSize, brushColor }, ref) => {
+  ({ imageSrc, brushSize, brushColor, enableDrawing = true }, ref) => {
     const mainCanvasRef = useRef<HTMLCanvasElement>(null);
     const previewCanvasRef = useRef<HTMLCanvasElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [image, setImage] = useState<HTMLImageElement | null>(null);
+    const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
     const lastPoint = useRef<{ x: number, y: number } | null>(null);
 
     useEffect(() => {
@@ -25,6 +28,8 @@ export const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
       img.src = imageSrc;
       img.onload = () => {
         setImage(img);
+        setDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+        
         const mainCanvas = mainCanvasRef.current;
         const previewCanvas = previewCanvasRef.current;
         if (mainCanvas && previewCanvas) {
@@ -77,27 +82,11 @@ export const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
             clientY = event.clientY;
         }
         
-        const { naturalWidth, naturalHeight } = image;
-        const { width: containerWidth, height: containerHeight } = rect;
-
-        const imageAspectRatio = naturalWidth / naturalHeight;
-        const containerAspectRatio = containerWidth / containerHeight;
-
-        let renderedWidth, renderedHeight, offsetX, offsetY;
-
-        if (imageAspectRatio > containerAspectRatio) {
-            // Image is wider than container, letterboxed top/bottom
-            renderedWidth = containerWidth;
-            renderedHeight = containerWidth / imageAspectRatio;
-            offsetX = 0;
-            offsetY = (containerHeight - renderedHeight) / 2;
-        } else {
-            // Image is taller than or same aspect as container, letterboxed left/right
-            renderedHeight = containerHeight;
-            renderedWidth = containerHeight * imageAspectRatio;
-            offsetY = 0;
-            offsetX = (containerWidth - renderedWidth) / 2;
-        }
+        // Since we are now sizing the container to the image, offset is 0 and render size matches container size
+        const renderedWidth = rect.width;
+        // const renderedHeight = rect.height; 
+        const offsetX = 0;
+        const offsetY = 0;
         
         const relativeX = clientX - rect.left;
         const relativeY = clientY - rect.top;
@@ -105,27 +94,27 @@ export const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
         // Check if cursor is outside the rendered image area
         if (
           clamp &&
-          (relativeX < offsetX ||
-          relativeX > offsetX + renderedWidth ||
-          relativeY < offsetY ||
-          relativeY > offsetY + renderedHeight)
+          (relativeX < 0 ||
+          relativeX > renderedWidth ||
+          relativeY < 0 ||
+          relativeY > rect.height)
         ) {
           return null;
         }
         
-        const imageRelativeX = relativeX - offsetX;
-        const imageRelativeY = relativeY - offsetY;
-
-        // The scale is the same for both X and Y because we maintain aspect ratio
-        const scale = naturalWidth / renderedWidth;
+        // The scale handles the zoom level implicitly because rect.width includes the CSS transform scale from parent
+        // naturalWidth / rect.width converts screen pixels back to canvas pixels
+        const scale = image.naturalWidth / renderedWidth;
 
         return {
-            x: imageRelativeX * scale,
-            y: imageRelativeY * scale
+            x: relativeX * scale,
+            y: relativeY * scale
         };
     }, [image]);
 
     const startDrawing = (event: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+      if (!enableDrawing) return;
+      event.stopPropagation(); // Prevent panning when trying to draw
       const coords = getCoordinates(event);
       if (!coords) return;
       setIsDrawing(true);
@@ -133,6 +122,8 @@ export const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
     };
 
     const draw = (event: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+      if (!enableDrawing) return;
+      event.stopPropagation();
       if (!isDrawing) return;
       const coords = getCoordinates(event);
       if (!coords || !lastPoint.current) return;
@@ -153,7 +144,9 @@ export const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
       lastPoint.current = coords;
     };
 
-    const stopDrawing = () => {
+    const stopDrawing = (event: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+      if (!enableDrawing) return;
+      event.stopPropagation();
       setIsDrawing(false);
       lastPoint.current = null;
     };
@@ -166,6 +159,8 @@ export const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
 
       // Always clear the preview canvas
       ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+
+      if (!enableDrawing) return;
       
       // Get coordinates without clamping to the image bounds for preview
       const coords = getCoordinates(event, false);
@@ -204,13 +199,15 @@ export const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
     };
 
     const handleMouseLeave = () => {
-        stopDrawing();
+        setIsDrawing(false);
+        lastPoint.current = null;
         clearPreview();
     };
 
     return (
         <div
-            className="absolute top-0 left-0 w-full h-full cursor-none"
+            className={`relative origin-center ${enableDrawing ? 'cursor-none' : 'cursor-grab'}`}
+            style={{ width: dimensions.width, height: dimensions.height }}
             onMouseDown={startDrawing}
             onMouseMove={handleMouseMove}
             onMouseUp={stopDrawing}
@@ -221,11 +218,11 @@ export const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
         >
             <canvas
                 ref={mainCanvasRef}
-                className="absolute top-0 left-0 w-full h-full object-contain"
+                className="absolute top-0 left-0 w-full h-full"
             />
             <canvas
                 ref={previewCanvasRef}
-                className="absolute top-0 left-0 w-full h-full object-contain pointer-events-none"
+                className="absolute top-0 left-0 w-full h-full pointer-events-none"
             />
         </div>
     );

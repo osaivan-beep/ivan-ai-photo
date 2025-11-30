@@ -1,3 +1,5 @@
+
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { TFunction, UploadedImage, StringTranslationKeys } from '../types';
 import { CloseIcon, DownloadIcon, SaveIcon, RedrawIcon, MirrorIcon, FlipVerticalIcon, CropIcon, ZoomInIcon, ZoomOutIcon, ArrowsPointingOutIcon, SwapVerticalIcon, TextIcon, TrashIcon, RotateIcon, ImageIcon, LightBrushIcon, UndoIcon, SharpenIcon, BlurIcon, EraserIcon, EyeIcon, BrushIcon, PlusIcon, EyeSlashIcon, SunIcon, MagicEraserIcon, SparklesIcon, SaturationIcon, ContrastIcon, FilmIcon, UserCircleIcon, CompareIcon, LeafIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, SplitViewIcon, RadialGradientIcon, LinearGradientIcon, InvertIcon } from './Icons';
@@ -9,6 +11,8 @@ interface PhotoEditorProps {
     onSave: (id: string, dataUrl: string) => void;
     onClose: () => void;
     t: TFunction;
+    userCredits: number;
+    onDeductCredits: (amount: number) => void;
 }
 
 // Overlay Types
@@ -847,7 +851,181 @@ const PanControl: React.FC<PanControlProps> = ({ onPan, panSpeed = 5 }) => {
   );
 };
 
-export const PhotoEditor: React.FC<PhotoEditorProps> = ({ image, onSave, onClose, t }) => {
+const AdjustmentBrushPanel: React.FC<{
+    settings: AdjustmentBrushSettings;
+    onSettingsChange: React.Dispatch<React.SetStateAction<AdjustmentBrushSettings>>;
+    maskLayers: MaskLayer[];
+    onMaskLayersChange: React.Dispatch<React.SetStateAction<MaskLayer[]>>;
+    activeMaskLayerId: string | null;
+    onActiveMaskLayerIdChange: (id: string) => void;
+    onUndo: () => void;
+    t: TFunction;
+    onUpdateGradient: (updates: Partial<NonNullable<MaskLayer['gradient']>>) => void;
+}> = ({ settings, onSettingsChange, maskLayers, onMaskLayersChange, activeMaskLayerId, onActiveMaskLayerIdChange, onUndo, t, onUpdateGradient }) => {
+    
+    const activeLayer = maskLayers.find(l => l.id === activeMaskLayerId);
+
+    const handleAddLayer = (type: MaskType) => {
+        const newLayer: MaskLayer = {
+            id: `mask-${Date.now()}`,
+            name: `${t('maskLayerName')} ${maskLayers.length + 1}`,
+            isVisible: true,
+            type: type,
+            strokes: [],
+            adjustments: { ...INITIAL_ADJUSTMENTS, colorMixer: INITIAL_COLOR_MIXER }, // Reset adjustments for new layer
+            invert: false,
+            gradient: type === 'linear' ? {
+                start: { x: 50, y: 20 },
+                end: { x: 50, y: 80 },
+                feather: 50
+            } : type === 'radial' ? {
+                start: { x: 50, y: 50 },
+                end: { x: 80, y: 50 },
+                radiusY: 1,
+                feather: 50
+            } : undefined
+        };
+        onMaskLayersChange([...maskLayers, newLayer]);
+        onActiveMaskLayerIdChange(newLayer.id);
+    };
+
+    const handleDeleteLayer = (id: string) => {
+        const newLayers = maskLayers.filter(l => l.id !== id);
+        onMaskLayersChange(newLayers);
+        if (activeMaskLayerId === id) {
+            onActiveMaskLayerIdChange(newLayers.length > 0 ? newLayers[newLayers.length - 1].id : ''); // Handle empty? PhotoEditor creates one if empty.
+        }
+    };
+
+    const handleUpdateLayer = (id: string, updates: Partial<MaskLayer>) => {
+        onMaskLayersChange(maskLayers.map(l => l.id === id ? { ...l, ...updates } : l));
+    };
+
+    const handleLayerAdjustmentChange = (newAdjustments: Adjustments) => {
+        if (activeMaskLayerId) {
+            handleUpdateLayer(activeMaskLayerId, { adjustments: newAdjustments });
+        }
+    };
+    
+    const setLayerAdjustments = (action: React.SetStateAction<Adjustments>) => {
+        if (!activeLayer) return;
+        const newAdj = typeof action === 'function' ? action(activeLayer.adjustments) : action;
+        handleLayerAdjustmentChange(newAdj);
+    };
+
+    return (
+        <div className="space-y-4">
+             {/* Mask Layer Management */}
+             <div className="p-3 bg-gray-900/50 rounded-lg space-y-2">
+                <div className="flex justify-between items-center">
+                    <h4 className="font-semibold text-gray-400">{t('maskLayersLabel')}</h4>
+                    <div className="flex gap-1">
+                        <button onClick={() => handleAddLayer('brush')} className="p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-300" title={t('addBrushMaskButton')}><BrushIcon className="w-4 h-4"/></button>
+                        <button onClick={() => handleAddLayer('radial')} className="p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-300" title={t('addRadialMaskButton')}><RadialGradientIcon className="w-4 h-4"/></button>
+                        <button onClick={() => handleAddLayer('linear')} className="p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-300" title={t('addLinearMaskButton')}><LinearGradientIcon className="w-4 h-4"/></button>
+                    </div>
+                </div>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                    {maskLayers.map(layer => (
+                        <div key={layer.id} 
+                             className={`flex items-center justify-between p-2 rounded cursor-pointer ${layer.id === activeMaskLayerId ? 'bg-purple-900/50 border border-purple-500/50' : 'bg-gray-800 hover:bg-gray-700'}`}
+                             onClick={() => onActiveMaskLayerIdChange(layer.id)}
+                        >
+                            <div className="flex items-center gap-2 overflow-hidden">
+                                {layer.type === 'brush' && <BrushIcon className="w-3 h-3 text-gray-400 flex-shrink-0" />}
+                                {layer.type === 'radial' && <RadialGradientIcon className="w-3 h-3 text-gray-400 flex-shrink-0" />}
+                                {layer.type === 'linear' && <LinearGradientIcon className="w-3 h-3 text-gray-400 flex-shrink-0" />}
+                                <span className="text-sm text-gray-200 truncate">{layer.name}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <button onClick={(e) => { e.stopPropagation(); handleUpdateLayer(layer.id, { isVisible: !layer.isVisible }); }} className={`p-1 rounded hover:bg-gray-600 ${layer.isVisible ? 'text-gray-300' : 'text-gray-600'}`}>
+                                    {layer.isVisible ? <EyeIcon className="w-3 h-3" /> : <EyeSlashIcon className="w-3 h-3" />}
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); handleDeleteLayer(layer.id); }} className="p-1 rounded hover:bg-red-900/50 text-gray-400 hover:text-red-400">
+                                    <TrashIcon className="w-3 h-3" />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+             </div>
+
+             {activeLayer && (
+                <>
+                    <div className="p-3 bg-gray-900/50 rounded-lg space-y-3">
+                        <div className="flex justify-between items-center">
+                            <h4 className="font-semibold text-gray-400">{t('adjustmentBrushLabel')}</h4>
+                             <div className="flex items-center gap-2">
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                    <input type="checkbox" checked={activeLayer.invert} onChange={(e) => handleUpdateLayer(activeLayer.id, { invert: e.target.checked })} className="rounded bg-gray-700 border-gray-600 text-purple-600 focus:ring-purple-500" />
+                                    <span className="text-xs text-gray-300">{t('invertMaskLabel')}</span>
+                                </label>
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                    <input type="checkbox" checked={settings.showMask} onChange={(e) => onSettingsChange(p => ({ ...p, showMask: e.target.checked }))} className="rounded bg-gray-700 border-gray-600 text-purple-600 focus:ring-purple-500" />
+                                    <span className="text-xs text-gray-300">{t('showMaskLabel')}</span>
+                                </label>
+                             </div>
+                        </div>
+
+                        {activeLayer.type === 'brush' && (
+                            <>
+                                <div className="flex bg-gray-700 rounded-lg p-1">
+                                    <button onClick={() => onSettingsChange(s => ({ ...s, isErasing: false }))} className={`flex-1 py-1 text-xs font-semibold rounded-md ${!settings.isErasing ? 'bg-purple-600 text-white' : 'text-gray-300'}`}>{t('paintButton')}</button>
+                                    <button onClick={() => onSettingsChange(s => ({ ...s, isErasing: true }))} className={`flex-1 py-1 text-xs font-semibold rounded-md ${settings.isErasing ? 'bg-purple-600 text-white' : 'text-gray-300'}`}>{t('eraseButton')}</button>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-gray-400">{t('brushSizeLabel')}</span>
+                                    <button onClick={onUndo} className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1"><UndoIcon className="w-3 h-3"/> {t('undoButton')}</button>
+                                </div>
+                                <AdjustmentSlider label="" value={settings.size} min={1} max={300} onChange={v => onSettingsChange(s => ({ ...s, size: v }))} resetValue={50} />
+                                
+                                <span className="text-xs text-gray-400">{t('brushFeatherLabel')}</span>
+                                <AdjustmentSlider label="" value={settings.feather} min={0} max={100} onChange={v => onSettingsChange(s => ({ ...s, feather: v }))} resetValue={80} />
+                                
+                                <span className="text-xs text-gray-400">{t('brushStrengthLabel')}</span>
+                                <AdjustmentSlider label="" value={settings.strength} min={1} max={100} onChange={v => onSettingsChange(s => ({ ...s, strength: v }))} resetValue={50} />
+                            </>
+                        )}
+                        
+                        {(activeLayer.type === 'linear' || activeLayer.type === 'radial') && activeLayer.gradient && (
+                             <>
+                                <h4 className="font-semibold text-gray-400 text-xs">{t('gradientSettingsLabel')}</h4>
+                                <span className="text-xs text-gray-400">{t('brushFeatherLabel')}</span>
+                                <AdjustmentSlider label="" value={activeLayer.gradient.feather} min={0} max={100} onChange={v => onUpdateGradient({ feather: v })} resetValue={50} />
+                             </>
+                        )}
+                    </div>
+                    
+                    {/* Adjustment Sliders for the Mask */}
+                    <div className="space-y-3">
+                         <div className="p-3 bg-gray-900/50 rounded-lg space-y-3">
+                            <h4 className="font-semibold text-gray-400 text-xs uppercase tracking-wider">{t('lightLabel')}</h4>
+                            <AdjustmentSlider label={t('exposureLabel')} value={activeLayer.adjustments.exposure} onChange={v => setLayerAdjustments(p => ({ ...p, exposure: v }))} resetValue={0} />
+                            <AdjustmentSlider label={t('brightnessLabel')} value={activeLayer.adjustments.brightness} onChange={v => setLayerAdjustments(p => ({ ...p, brightness: v }))} resetValue={0} />
+                            <AdjustmentSlider label={t('contrastLabel')} value={activeLayer.adjustments.contrast} onChange={v => setLayerAdjustments(p => ({ ...p, contrast: v }))} resetValue={0} />
+                            <AdjustmentSlider label={t('highlightsLabel')} value={activeLayer.adjustments.highlights} onChange={v => setLayerAdjustments(p => ({ ...p, highlights: v }))} resetValue={0} />
+                            <AdjustmentSlider label={t('shadowsLabel')} value={activeLayer.adjustments.shadows} onChange={v => setLayerAdjustments(p => ({ ...p, shadows: v }))} resetValue={0} />
+                         </div>
+                         <div className="p-3 bg-gray-900/50 rounded-lg space-y-3">
+                            <h4 className="font-semibold text-gray-400 text-xs uppercase tracking-wider">{t('colorLabel')}</h4>
+                            <AdjustmentSlider label={t('saturationLabel')} value={activeLayer.adjustments.saturate} onChange={v => setLayerAdjustments(p => ({ ...p, saturate: v }))} resetValue={0} />
+                            <AdjustmentSlider label={t('temperatureLabel')} value={activeLayer.adjustments.temperature} onChange={v => setLayerAdjustments(p => ({ ...p, temperature: v }))} resetValue={0} />
+                            <AdjustmentSlider label={t('tintLabel')} value={activeLayer.adjustments.tint} onChange={v => setLayerAdjustments(p => ({ ...p, tint: v }))} resetValue={0} />
+                         </div>
+                         <div className="p-3 bg-gray-900/50 rounded-lg space-y-3">
+                             <h4 className="font-semibold text-gray-400 text-xs uppercase tracking-wider">{t('clarityLabel')}</h4>
+                            <AdjustmentSlider label={t('clarityLabel')} value={activeLayer.adjustments.clarity} onChange={v => setLayerAdjustments(p => ({ ...p, clarity: v }))} min={0} max={10} resetValue={0} />
+                            <AdjustmentSlider label={t('dehazeLabel')} value={activeLayer.adjustments.dehaze} onChange={v => setLayerAdjustments(p => ({ ...p, dehaze: v }))} min={0} max={100} resetValue={0} />
+                            <AdjustmentSlider label={t('blurLabel')} value={activeLayer.adjustments.blur} onChange={v => setLayerAdjustments(p => ({ ...p, blur: v }))} min={0} max={20} resetValue={0} />
+                         </div>
+                    </div>
+                </>
+             )}
+        </div>
+    );
+};
+
+export const PhotoEditor: React.FC<PhotoEditorProps> = ({ image, onSave, onClose, t, userCredits, onDeductCredits }) => {
     const [editedDataUrl, setEditedDataUrl] = useState(image.dataUrl);
     const [adjustments, setAdjustments] = useState<Adjustments>(INITIAL_ADJUSTMENTS);
     const [transforms, setTransforms] = useState<Transforms>(INITIAL_TRANSFORMS);
@@ -1961,6 +2139,13 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ image, onSave, onClose
 
     const handleApplyRemove = async () => {
         if (removeToolStrokes.length === 0) return;
+        
+        // Credit Check
+        if (userCredits < 5) {
+             alert(t('notEnoughCredits'));
+             return;
+        }
+
         setIsRemoving(true);
         try {
             const imageDataUrl = await exportImage(true);
@@ -1975,6 +2160,9 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ image, onSave, onClose
             if (response.candidates && response.candidates[0]?.content?.parts) {
                 const imagePart = response.candidates[0].content.parts.find(p => p.inlineData);
                 if (imagePart?.inlineData) {
+                    // Success! Deduct credits
+                    onDeductCredits(5);
+
                     const resultImageUrl = `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
                     setEditedDataUrl(resultImageUrl);
                     resetAll();
@@ -1987,6 +2175,11 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ image, onSave, onClose
             }
         } catch (error) {
             console.error("Failed to apply remove tool:", error);
+            if (error instanceof Error && (error.message.includes('PERMISSION_DENIED') || error.message.includes('RESOURCE_EXHAUSTED'))) {
+                 alert(t('rateLimitError'));
+            } else {
+                 alert(t('errorTitle'));
+            }
         } finally {
             setIsRemoving(false);
         }
@@ -3125,224 +3318,49 @@ const TextPanel: React.FC<{
                                     className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200"
                                 >
                                     {FONT_OPTIONS.map(font => (
-                                        <option key={font.value} value={font.value} style={{fontFamily: font.value}}>{font.name}</option>
+                                        <option key={font.value} value={font.value}>{font.name}</option>
                                     ))}
                                 </select>
                             </div>
-                            <AdjustmentSlider label={t('fontSizeLabel')} value={selectedOverlay.fontSize} onChange={v => handleStyleChange('fontSize', v)} min={8} max={200} resetValue={48} />
-                            <div className="flex items-center gap-2">
-                                <label className="text-sm text-gray-300">{t('colorLabel')}:</label>
-                                <input
-                                    type="color"
-                                    value={selectedOverlay.color}
-                                    onChange={(e) => handleStyleChange('color', e.target.value)}
-                                    className="w-8 h-8 rounded border-none bg-gray-700 cursor-pointer"
-                                />
-                                <div className="flex-grow flex justify-end gap-1">
-                                    <button onClick={() => handleStyleChange('bold', !selectedOverlay.bold)} className={`p-2 rounded-md ${selectedOverlay.bold ? 'bg-purple-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>B</button>
-                                    <button onClick={() => handleStyleChange('italic', !selectedOverlay.italic)} className={`p-2 rounded-md italic ${selectedOverlay.italic ? 'bg-purple-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>I</button>
+                             <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-sm text-gray-300 mb-1 block">{t('colorLabel')}</label>
+                                    <input
+                                        type="color"
+                                        value={selectedOverlay.color}
+                                        onChange={(e) => handleStyleChange('color', e.target.value)}
+                                        className="w-full h-8 rounded border-none bg-gray-700 cursor-pointer"
+                                    />
                                 </div>
-                            </div>
+                                <div className="flex gap-1 items-end">
+                                    <button onClick={() => handleStyleChange('bold', !selectedOverlay.bold)} className={`flex-1 p-1.5 rounded ${selectedOverlay.bold ? 'bg-purple-600' : 'bg-gray-700'}`}>B</button>
+                                    <button onClick={() => handleStyleChange('italic', !selectedOverlay.italic)} className={`flex-1 p-1.5 rounded ${selectedOverlay.italic ? 'bg-purple-600' : 'bg-gray-700'}`}>I</button>
+                                </div>
+                             </div>
+                             <AdjustmentSlider label={t('fontSizeLabel')} value={selectedOverlay.fontSize} min={10} max={200} onChange={v => handleStyleChange('fontSize', v)} resetValue={48} />
                         </>
                     )}
-                     <div>
-                        <label className="text-sm text-gray-300 mb-1 block">{t('positionLabel')}</label>
-                        <div className="grid grid-cols-3 gap-1 bg-gray-700 p-1 rounded-md">
-                            {positions.map((pos) => (
-                                <button
-                                    key={pos.name}
-                                    onClick={() => handlePositionClick(pos.x, pos.y)}
-                                    className="w-full aspect-square bg-gray-800 hover:bg-purple-600 rounded-sm flex items-center justify-center transition-colors"
-                                    title={pos.name}
-                                    aria-label={`Position ${pos.name}`}
-                                >
-                                    <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                                </button>
-                            ))}
-                        </div>
+                    
+                    <AdjustmentSlider label={t('opacityLabel')} value={selectedOverlay.opacity} min={0} max={100} onChange={v => handleStyleChange('opacity', v)} resetValue={100} />
+                    
+                    <div>
+                         <label className="text-sm text-gray-300 mb-1 block">{t('positionLabel')}</label>
+                         <div className="grid grid-cols-3 gap-1">
+                             {positions.map(pos => (
+                                 <button key={pos.name} onClick={() => handlePositionClick(pos.x, pos.y)} className="h-6 bg-gray-700 hover:bg-gray-600 rounded" title={pos.name}></button>
+                             ))}
+                         </div>
                     </div>
-                    <AdjustmentSlider label={t('opacityLabel')} value={selectedOverlay.opacity} onChange={v => handleStyleChange('opacity', v)} resetValue={selectedOverlay.type === 'image' ? 50 : 100} />
-                    <div className="pt-2 border-t border-gray-700/50">
-                        {selectedOverlay.type === 'text' && selectedOverlay.templateId ? (
-                            <div className="grid grid-cols-2 gap-2">
-                                <button
-                                    onClick={onUpdateTemplate}
-                                    disabled={!selectedOverlay.templateId}
-                                    className="flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                                ><SaveIcon className="w-5 h-5"/>{t('updateTemplateButton')}</button>
-                                <button onClick={onDeleteOverlay} className="flex items-center justify-center gap-2 w-full bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg"><TrashIcon className="w-5 h-5"/>{t('deleteLayerButton')}</button>
-                            </div>
-                        ) : (
-                            <button onClick={onDeleteOverlay} className="flex items-center justify-center gap-2 w-full bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg"><TrashIcon className="w-5 h-5"/>{t('deleteLayerButton')}</button>
-                        )}
+
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-700">
+                         {selectedOverlay.type === 'text' && selectedOverlay.templateId && (
+                            <button onClick={onUpdateTemplate} className="text-xs bg-blue-600/80 hover:bg-blue-700 text-white font-semibold py-2 px-2 rounded">{t('updateTemplateButton')}</button>
+                         )}
+                         <button onClick={onDeleteOverlay} className="flex items-center justify-center gap-1.5 text-xs bg-red-600/80 hover:bg-red-700 text-white font-semibold py-2 px-2 rounded col-span-2">
+                             <TrashIcon className="w-4 h-4" /> {t('deleteLayerButton')}
+                         </button>
                     </div>
                 </div>
-            )}
-        </div>
-    );
-};
-
-interface AdjustmentBrushPanelProps {
-    settings: AdjustmentBrushSettings;
-    onSettingsChange: React.Dispatch<React.SetStateAction<AdjustmentBrushSettings>>;
-    maskLayers: MaskLayer[];
-    onMaskLayersChange: React.Dispatch<React.SetStateAction<MaskLayer[]>>;
-    activeMaskLayerId: string | null;
-    onActiveMaskLayerIdChange: React.Dispatch<React.SetStateAction<string | null>>;
-    onUndo: () => void;
-    t: TFunction;
-    onUpdateGradient: (updates: Partial<NonNullable<MaskLayer['gradient']>>) => void;
-}
-
-const AdjustmentBrushPanel: React.FC<AdjustmentBrushPanelProps> = (
-    { settings, onSettingsChange, maskLayers, onMaskLayersChange, activeMaskLayerId, onActiveMaskLayerIdChange, onUndo, t, onUpdateGradient }
-) => {
-    const activeLayer = maskLayers.find(l => l.id === activeMaskLayerId);
-    
-    const handleSettingChange = (key: keyof AdjustmentBrushSettings, value: any) => {
-        onSettingsChange(prev => ({ ...prev, [key]: value }));
-    };
-
-    const handleMaskAdjustmentChange = (key: keyof Omit<Adjustments, 'colorMixer' | 'enhance' | 'dehaze' | 'vibrance' | 'accent'>, value: number) => {
-        if (!activeMaskLayerId) return;
-        onMaskLayersChange(prev => prev.map(l => l.id === activeMaskLayerId ? { ...l, adjustments: { ...l.adjustments, [key]: value } } : l));
-    };
-
-    const handleAddLayer = (type: MaskType = 'brush') => {
-        const newLayer: MaskLayer = {
-            id: `mask-${Date.now()}`,
-            name: `${t('maskLayerName')} ${maskLayers.length + 1} (${type === 'brush' ? t('addBrushMaskButton') : type === 'radial' ? t('addRadialMaskButton') : t('addLinearMaskButton')})`,
-            isVisible: true,
-            type,
-            strokes: [],
-            adjustments: { ...INITIAL_ADJUSTMENTS, colorMixer: INITIAL_COLOR_MIXER },
-            invert: false,
-        };
-        if (type === 'linear') {
-            newLayer.gradient = { start: { x: 50, y: 20 }, end: { x: 50, y: 80 }, feather: 20 };
-        } else if (type === 'radial') {
-            newLayer.gradient = { start: { x: 50, y: 50 }, end: { x: 80, y: 50 }, feather: 20, rotation: 0, radiusY: 1 };
-        }
-        onMaskLayersChange(prev => [...prev, newLayer]);
-        onActiveMaskLayerIdChange(newLayer.id);
-    };
-
-    const handleDeleteLayer = (id: string) => {
-        onMaskLayersChange(prev => prev.filter(l => l.id !== id));
-        if(activeMaskLayerId === id) {
-            onActiveMaskLayerIdChange(maskLayers.length > 1 ? maskLayers.find(l => l.id !== id)!.id : null);
-        }
-    };
-
-    const handleToggleVisibility = (id: string) => {
-        onMaskLayersChange(prev => prev.map(l => l.id === id ? { ...l, isVisible: !l.isVisible } : l));
-    };
-    
-    const handleToggleInvert = (id: string) => {
-        onMaskLayersChange(prev => prev.map(l => l.id === id ? { ...l, invert: !l.invert } : l));
-    };
-
-    return (
-        <div className="space-y-4">
-             <div className="flex flex-col gap-3 p-3 bg-gray-900/50 rounded-lg">
-                <div className="flex justify-between items-center">
-                    <h4 className="font-semibold text-gray-400">{t('adjustmentBrushLabel')}</h4>
-                    <div className="flex gap-1">
-                         <button onClick={() => handleAddLayer('brush')} className="p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-white" title={t('addBrushMaskButton')}><BrushIcon className="w-4 h-4"/></button>
-                         <button onClick={() => handleAddLayer('radial')} className="p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-white" title={t('addRadialMaskButton')}><RadialGradientIcon className="w-4 h-4"/></button>
-                         <button onClick={() => handleAddLayer('linear')} className="p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-white" title={t('addLinearMaskButton')}><LinearGradientIcon className="w-4 h-4"/></button>
-                    </div>
-                </div>
-                
-                {/* Layer List */}
-                <div className="space-y-1 max-h-40 overflow-y-auto custom-scrollbar">
-                    {maskLayers.map((layer, index) => (
-                        <div 
-                            key={layer.id} 
-                            onClick={() => onActiveMaskLayerIdChange(layer.id)}
-                            className={`flex items-center justify-between p-2 rounded-md cursor-pointer border ${activeMaskLayerId === layer.id ? 'bg-purple-900/30 border-purple-500' : 'bg-gray-800 border-transparent hover:bg-gray-700'}`}
-                        >
-                            <div className="flex items-center gap-2 overflow-hidden">
-                                <button onClick={(e) => { e.stopPropagation(); handleToggleVisibility(layer.id); }} className={`${layer.isVisible ? 'text-gray-200' : 'text-gray-600'}`}>
-                                    {layer.isVisible ? <EyeIcon className="w-4 h-4"/> : <EyeSlashIcon className="w-4 h-4"/>}
-                                </button>
-                                <span className="text-sm truncate w-24">{layer.name}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                                <button onClick={(e) => { e.stopPropagation(); handleToggleInvert(layer.id); }} className={`p-1 rounded ${layer.invert ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`} title={t('invertMaskLabel')}>
-                                    <InvertIcon className="w-3 h-3"/>
-                                </button>
-                                <button onClick={(e) => { e.stopPropagation(); handleDeleteLayer(layer.id); }} className="p-1 text-gray-400 hover:text-red-400">
-                                    <TrashIcon className="w-3 h-3"/>
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-                
-                <div className="flex items-center gap-2 pt-2 border-t border-gray-700">
-                    <input 
-                        type="checkbox" 
-                        id="showMask" 
-                        checked={settings.showMask} 
-                        onChange={(e) => handleSettingChange('showMask', e.target.checked)}
-                        className="rounded bg-gray-700 border-gray-600 text-purple-600 focus:ring-purple-500"
-                    />
-                    <label htmlFor="showMask" className="text-sm text-gray-300 cursor-pointer">{t('showMaskLabel')}</label>
-                </div>
-            </div>
-
-            {activeLayer && (
-                <>
-                    <div className="p-3 bg-gray-900/50 rounded-lg space-y-3">
-                         <div className="flex justify-between items-center">
-                             <h4 className="font-semibold text-gray-400">
-                                {activeLayer.type === 'brush' ? t('brushSettingsLabel') : t('gradientSettingsLabel')}
-                             </h4>
-                             {activeLayer.type === 'brush' && (
-                                <button onClick={onUndo} className="flex items-center gap-1.5 text-sm text-purple-400 hover:text-purple-300 font-semibold">
-                                    <UndoIcon className="w-4 h-4"/>{t('undoButton')}
-                                </button>
-                             )}
-                        </div>
-
-                        {activeLayer.type === 'brush' && (
-                            <>
-                                <div className="flex bg-gray-700 rounded-lg p-1">
-                                    <button onClick={() => handleSettingChange('isErasing', false)} className={`flex-1 py-1 text-sm rounded-md ${!settings.isErasing ? 'bg-purple-600 text-white' : 'text-gray-300'}`}>{t('paintButton')}</button>
-                                    <button onClick={() => handleSettingChange('isErasing', true)} className={`flex-1 py-1 text-sm rounded-md ${settings.isErasing ? 'bg-purple-600 text-white' : 'text-gray-300'}`}>{t('eraseButton')}</button>
-                                </div>
-                                <AdjustmentSlider label={t('brushSizeLabel')} value={settings.size} min={1} max={300} onChange={(v) => handleSettingChange('size', v)} resetValue={50} />
-                                <AdjustmentSlider label={t('brushStrengthLabel')} value={settings.strength} min={1} max={100} onChange={(v) => handleSettingChange('strength', v)} resetValue={50} />
-                                <AdjustmentSlider label={t('brushFeatherLabel')} value={settings.feather} min={0} max={100} onChange={(v) => handleSettingChange('feather', v)} resetValue={80} />
-                            </>
-                        )}
-
-                        {(activeLayer.type === 'radial' || activeLayer.type === 'linear') && activeLayer.gradient && (
-                             <AdjustmentSlider 
-                                label={t('brushFeatherLabel')} 
-                                value={activeLayer.gradient.feather} 
-                                min={0} max={100} 
-                                onChange={(v) => onUpdateGradient({ feather: v })} 
-                                resetValue={20} 
-                             />
-                        )}
-                    </div>
-
-                    <div className="p-3 bg-gray-900/50 rounded-lg space-y-3">
-                        <h4 className="font-semibold text-gray-400">{t('adjustmentsLabel')}</h4>
-                        <AdjustmentSlider label={t('exposureLabel')} value={activeLayer.adjustments.exposure} onChange={v => handleMaskAdjustmentChange('exposure', v)} resetValue={0} />
-                        <AdjustmentSlider label={t('contrastLabel')} value={activeLayer.adjustments.contrast} onChange={v => handleMaskAdjustmentChange('contrast', v)} resetValue={0} />
-                        <AdjustmentSlider label={t('brightnessLabel')} value={activeLayer.adjustments.brightness} onChange={v => handleMaskAdjustmentChange('brightness', v)} resetValue={0} />
-                        <AdjustmentSlider label={t('saturationLabel')} value={activeLayer.adjustments.saturate} onChange={v => handleMaskAdjustmentChange('saturate', v)} resetValue={0} />
-                        <AdjustmentSlider label={t('highlightsLabel')} value={activeLayer.adjustments.highlights} onChange={v => handleMaskAdjustmentChange('highlights', v)} resetValue={0} />
-                        <AdjustmentSlider label={t('shadowsLabel')} value={activeLayer.adjustments.shadows} onChange={v => handleMaskAdjustmentChange('shadows', v)} resetValue={0} />
-                        <AdjustmentSlider label={t('clarityLabel')} value={activeLayer.adjustments.clarity} min={0} max={10} onChange={v => handleMaskAdjustmentChange('clarity', v)} resetValue={0} />
-                        <AdjustmentSlider label={t('blurLabel')} value={activeLayer.adjustments.blur} min={0} max={20} onChange={v => handleMaskAdjustmentChange('blur', v)} resetValue={0} />
-                        <AdjustmentSlider label={t('temperatureLabel')} value={activeLayer.adjustments.temperature} onChange={v => handleMaskAdjustmentChange('temperature', v)} resetValue={0} />
-                        <AdjustmentSlider label={t('tintLabel')} value={activeLayer.adjustments.tint} onChange={v => handleMaskAdjustmentChange('tint', v)} resetValue={0} />
-                    </div>
-                </>
             )}
         </div>
     );
