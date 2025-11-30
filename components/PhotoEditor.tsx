@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { TFunction, UploadedImage, StringTranslationKeys } from '../types';
 import { CloseIcon, DownloadIcon, SaveIcon, RedrawIcon, MirrorIcon, FlipVerticalIcon, CropIcon, ZoomInIcon, ZoomOutIcon, ArrowsPointingOutIcon, SwapVerticalIcon, TextIcon, TrashIcon, RotateIcon, ImageIcon, LightBrushIcon, UndoIcon, SharpenIcon, BlurIcon, EraserIcon, EyeIcon, BrushIcon, PlusIcon, EyeSlashIcon, SunIcon, MagicEraserIcon, SparklesIcon, SaturationIcon, ContrastIcon, FilmIcon, UserCircleIcon, CompareIcon, LeafIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, SplitViewIcon, RadialGradientIcon, LinearGradientIcon, InvertIcon } from './Icons';
@@ -2140,8 +2141,8 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ image, onSave, onClose
     const handleApplyRemove = async () => {
         if (removeToolStrokes.length === 0) return;
         
-        // Credit Check
-        if (userCredits < 5) {
+        // Credit Check: Updated to 3 credits
+        if (userCredits < 3) {
              alert(t('notEnoughCredits'));
              return;
         }
@@ -2152,16 +2153,17 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ image, onSave, onClose
             const [header, base64Data] = imageDataUrl.split(',');
             if (!base64Data) throw new Error("Invalid image data URL for remove tool.");
             
-            const response = await editImageWithGemini(
+            const result = await editImageWithGemini(
                 [{ base64Data, mimeType: 'image/jpeg' }],
                 t('removePrompt')
             );
+            const response = result.response;
 
             if (response.candidates && response.candidates[0]?.content?.parts) {
                 const imagePart = response.candidates[0].content.parts.find(p => p.inlineData);
                 if (imagePart?.inlineData) {
-                    // Success! Deduct credits
-                    onDeductCredits(5);
+                    // Success! Deduct credits: Updated to 3
+                    onDeductCredits(3);
 
                     const resultImageUrl = `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
                     setEditedDataUrl(resultImageUrl);
