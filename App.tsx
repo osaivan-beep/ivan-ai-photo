@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { GenerateContentResponse } from '@google/genai';
 import { CanvasEditor, type CanvasEditorRef } from './components/CanvasEditor';
@@ -69,15 +70,18 @@ const LaunchScreen: React.FC<{ onConnect: () => void; t: TFunction }> = ({ onCon
             </div>
             <h1 className="text-3xl font-bold text-white mb-4">{t('title')}</h1>
             <p className="text-gray-300 mb-8">
-                System ready. Please proceed to login.
+                To use the advanced <strong>Gemini 3 Pro</strong> features (High Resolution, Magic Enhance), you need to connect a Google Cloud project.
             </p>
             <button
                 onClick={onConnect}
                 className="w-full py-3 px-6 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-xl transition-all transform hover:scale-105 shadow-lg flex items-center justify-center gap-2"
             >
-                <span>Start App</span>
+                <span>Connect Google Project</span>
                 <ArrowRightIcon className="w-5 h-5" />
             </button>
+             <p className="text-xs text-gray-500 mt-4">
+                Select a project with a linked billing account for 2K/4K generation.
+            </p>
         </div>
     </div>
 );
@@ -100,6 +104,7 @@ const LandingScreen: React.FC<{ onConfigSave: (config: FirebaseConfig) => void; 
 
     const handleConfigSubmit = async () => {
         const cleanAdminEmail = adminEmail.trim();
+        
         if (cleanAdminEmail !== 'osa.ivan@gmail.com') {
             alert(t('adminEmailValidation'));
             return;
@@ -108,52 +113,103 @@ const LandingScreen: React.FC<{ onConfigSave: (config: FirebaseConfig) => void; 
             alert("Password must be at least 6 characters.");
             return;
         }
+
         try {
             let clean = configStr.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1').trim();
-            clean = clean.replace(/：/g, ':').replace(/，/g, ',').replace(/“/g, '"').replace(/”/g, '"').replace(/‘/g, "'").replace(/’/g, "'").replace(/\s+=\s+/g, '=')
-                .replace(/項目ID|專案ID|Project ID/g, 'projectId').replace(/應用程式ID|App ID/g, 'appId').replace(/儲存空間值區|Storage Bucket/g, 'storageBucket')
-                .replace(/訊息傳送者ID|Messaging Sender ID/g, 'messagingSenderId').replace(/評估ID|Measurement ID/g, 'measurementId')
-                .replace(/API 金鑰|API Key/g, 'apiKey').replace(/驗證網域|Auth Domain/g, 'authDomain');
+
+            clean = clean
+                .replace(/：/g, ':')
+                .replace(/，/g, ',')
+                .replace(/“/g, '"')
+                .replace(/”/g, '"')
+                .replace(/‘/g, "'")
+                .replace(/’/g, "'")
+                .replace(/\s+=\s+/g, '=')
+                .replace(/項目ID|專案ID|Project ID/g, 'projectId')
+                .replace(/應用程式ID|App ID/g, 'appId')
+                .replace(/儲存空間值區|Storage Bucket/g, 'storageBucket')
+                .replace(/訊息傳送者ID|Messaging Sender ID/g, 'messagingSenderId')
+                .replace(/評估ID|Measurement ID/g, 'measurementId')
+                .replace(/API 金鑰|API Key/g, 'apiKey')
+                .replace(/驗證網域|Auth Domain/g, 'authDomain');
 
             let objectString: string | null = null;
             let match = clean.match(/\w+\s*=\s*({[\s\S]*?})(;|)/);
-            if (match) objectString = match[1];
-            else { match = clean.match(/({[\s\S]*?apiKey[\s\S]*?})/); if (match) objectString = match[1]; }
+            if (match) {
+                objectString = match[1];
+            } else {
+                 match = clean.match(/({[\s\S]*?apiKey[\s\S]*?})/);
+                 if (match) {
+                     objectString = match[1];
+                 }
+            }
 
             if (objectString) {
                 // eslint-disable-next-line no-new-func
                 const configObj = new Function(`return ${objectString}`)();
-                if (!configObj.apiKey) { alert(t('setupErrorMissingConfig')); return; }
+                
+                if (!configObj.apiKey) {
+                     alert(t('setupErrorMissingConfig'));
+                     return;
+                }
+                
                 onConfigSave({ ...configObj, adminEmail: cleanAdminEmail });
                 setSystemConfigured(true);
+
                 setLoading(true);
                 try {
-                    try { await register(cleanAdminEmail, adminPassword); } 
-                    catch (regError: any) { if (regError.code === 'auth/email-already-in-use') { await login(cleanAdminEmail, adminPassword); } else { throw regError; } }
+                    try {
+                        await register(cleanAdminEmail, adminPassword);
+                    } catch (regError: any) {
+                        if (regError.code === 'auth/email-already-in-use') {
+                            await login(cleanAdminEmail, adminPassword);
+                        } else {
+                            throw regError;
+                        }
+                    }
                 } catch (authError: any) {
                     console.error(authError);
-                    alert(`System initialized, but auto-login failed. Please login manually.`);
+                    alert(`System initialized, but auto-login failed: ${authError.message}. Please try logging in manually.`);
                     setActiveTab('user');
                     setEmail(cleanAdminEmail);
-                } finally { setLoading(false); }
+                } finally {
+                    setLoading(false);
+                }
             } else {
                 try {
                      const json = JSON.parse(clean);
                      if (json.apiKey) {
                          onConfigSave({ ...json, adminEmail: cleanAdminEmail });
                          setSystemConfigured(true);
+                         
                          setLoading(true);
-                         try { try { await register(cleanAdminEmail, adminPassword); } catch (regError: any) { if (regError.code === 'auth/email-already-in-use') { await login(cleanAdminEmail, adminPassword); } else { throw regError; } } } 
-                         catch (authError: any) { console.error(authError); alert(`System initialized. Please login.`); setActiveTab('user'); setEmail(cleanAdminEmail); } 
-                         finally { setLoading(false); }
+                         try {
+                            try {
+                                await register(cleanAdminEmail, adminPassword);
+                            } catch (regError: any) {
+                                if (regError.code === 'auth/email-already-in-use') {
+                                    await login(cleanAdminEmail, adminPassword);
+                                } else {
+                                    throw regError;
+                                }
+                            }
+                         } catch (authError: any) {
+                             console.error(authError);
+                             alert(`System initialized, but auto-login failed: ${authError.message}. Please try logging in manually.`);
+                             setActiveTab('user');
+                             setEmail(cleanAdminEmail);
+                         } finally {
+                             setLoading(false);
+                         }
                          return;
                      }
-                } catch (e) {}
+                } catch (e) {
+                }
                 throw new Error("Could not find a valid configuration object.");
             }
         } catch (e) {
             console.error(e);
-            alert(`${t('setupErrorInvalidFormat')}`);
+            alert(`${t('setupErrorInvalidFormat')}\n\nTechnical details: ${e instanceof Error ? e.message : 'Unknown error'}`);
         }
     };
 
@@ -165,8 +221,12 @@ const LandingScreen: React.FC<{ onConfigSave: (config: FirebaseConfig) => void; 
                  const url = `${window.location.origin}${window.location.pathname}?setup=${encoded}`;
                  navigator.clipboard.writeText(url);
                  alert(t('shareLinkCopied'));
-            } else { alert('Configuration not found.'); }
-        } catch (e) { alert('Failed to generate link.'); }
+            } else {
+                alert('Configuration not found. Please initialize first.');
+            }
+        } catch (e) {
+            alert('Failed to generate link.');
+        }
     };
 
     const handleAuthSubmit = async (e: React.FormEvent) => {
@@ -178,12 +238,22 @@ const LandingScreen: React.FC<{ onConfigSave: (config: FirebaseConfig) => void; 
             onAuthSuccess();
         } catch (err: any) {
             console.error(err);
-            if (err.code === 'auth/user-not-found') {
-                setError('此帳號未開通，請聯絡管理員。');
+            const errorMessage = err.message || '';
+            
+            if (err.code === 'auth/operation-not-allowed') {
+                setError('⚠️ 操作失敗：請至 Firebase Console > Authentication > Sign-in method 開啟「Email/Password」登入功能。');
+            } else if (errorMessage.includes('identity-toolkit-api-has-not-been-used-in-project') || errorMessage.includes('PROJECT_NOT_FOUND')) {
+                setError('⚠️ 設定正確！但 Google 系統生效需要時間。\n請等待約 3-5 分鐘後，再次嘗試登入。\n(請確保 Identity Toolkit API 已啟用)');
+            } else if (err.code === 'auth/email-already-in-use') {
+                setError('此 Email 已被註冊。');
             } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
                 setError('帳號或密碼錯誤。');
+            } else if (err.code === 'auth/weak-password') {
+                setError('密碼強度不足 (需 6 位以上)。');
+            } else if (err.code === 'auth/user-not-found') {
+                setError('找不到此帳號。請聯絡管理員開通。');
             } else {
-                setError(err.message || '登入失敗');
+                setError(errorMessage);
             }
         } finally {
             setLoading(false);
@@ -203,23 +273,69 @@ const LandingScreen: React.FC<{ onConfigSave: (config: FirebaseConfig) => void; 
                         </div>
                     )}
                 </div>
+
                 <div className="p-8 md:w-7/12 bg-gray-800">
                     <div className="flex border-b border-gray-700 mb-6">
-                        <button className={`flex-1 pb-3 text-sm font-medium transition-colors ${activeTab === 'user' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-500 hover:text-gray-300'}`} onClick={() => setActiveTab('user')}>{t('userLoginTab')}</button>
-                        {!hasEmbedded && <button className={`flex-1 pb-3 text-sm font-medium transition-colors ${activeTab === 'admin' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-500 hover:text-gray-300'}`} onClick={() => setActiveTab('admin')}>{t('adminSetupTab')}</button>}
+                        <button 
+                            className={`flex-1 pb-3 text-sm font-medium transition-colors ${activeTab === 'user' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-500 hover:text-gray-300'}`}
+                            onClick={() => setActiveTab('user')}
+                        >
+                            {t('userLoginTab')}
+                        </button>
+                        {!hasEmbedded && (
+                            <button 
+                                className={`flex-1 pb-3 text-sm font-medium transition-colors ${activeTab === 'admin' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-500 hover:text-gray-300'}`}
+                                onClick={() => setActiveTab('admin')}
+                            >
+                                {t('adminSetupTab')}
+                            </button>
+                        )}
                     </div>
+
                     {activeTab === 'user' ? (
                         <div>
                              {!systemConfigured && !hasEmbedded ? (
-                                 <div className="text-center py-8"><div className="bg-yellow-900/30 text-yellow-200 p-4 rounded-lg border border-yellow-700/50 mb-4">{t('systemNotReady')}</div></div>
+                                 <div className="text-center py-8">
+                                     <div className="bg-yellow-900/30 text-yellow-200 p-4 rounded-lg border border-yellow-700/50 mb-4">
+                                         {t('systemNotReady')}
+                                     </div>
+                                 </div>
                              ) : (
                                 <form onSubmit={handleAuthSubmit} className="space-y-4 animate-fade-in">
-                                    <h2 className="text-xl font-bold text-white mb-4">{t('loginTitle')}</h2>
+                                    <h2 className="text-xl font-bold text-white mb-4">
+                                        {t('loginTitle')}
+                                    </h2>
                                     {error && <div className="bg-red-900/50 text-red-200 p-3 rounded text-sm border border-red-700 whitespace-pre-line">{error}</div>}
-                                    <div><label className="block text-gray-400 text-sm mb-1">{t('emailLabel')}</label><input type="email" required className="w-full bg-gray-900 text-white p-3 rounded border border-gray-600 focus:border-purple-500 focus:outline-none" value={email} onChange={e => setEmail(e.target.value)}/></div>
-                                    <div><label className="block text-gray-400 text-sm mb-1">{t('passwordLabel')}</label><input type="password" required className="w-full bg-gray-900 text-white p-3 rounded border border-gray-600 focus:border-purple-500 focus:outline-none" value={password} onChange={e => setPassword(e.target.value)}/></div>
-                                    <button type="submit" disabled={loading} className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50">{loading ? '...' : t('loginButton')}</button>
-                                    <div className="mt-4 text-center"><p className="text-xs text-gray-500">Private Access Only.</p></div>
+                                    <div>
+                                        <label className="block text-gray-400 text-sm mb-1">{t('emailLabel')}</label>
+                                        <input 
+                                            type="email" required
+                                            className="w-full bg-gray-900 text-white p-3 rounded border border-gray-600 focus:border-purple-500 focus:outline-none"
+                                            value={email} onChange={e => setEmail(e.target.value)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <div className="flex justify-between">
+                                            <label className="block text-gray-400 text-sm mb-1">{t('passwordLabel')}</label>
+                                        </div>
+                                        <input 
+                                            type="password" required
+                                            className="w-full bg-gray-900 text-white p-3 rounded border border-gray-600 focus:border-purple-500 focus:outline-none"
+                                            value={password} onChange={e => setPassword(e.target.value)}
+                                        />
+                                    </div>
+                                    <button 
+                                        type="submit" 
+                                        disabled={loading}
+                                        className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50"
+                                    >
+                                        {loading ? '...' : t('loginButton')}
+                                    </button>
+                                    <div className="mt-4 text-center">
+                                        <p className="text-xs text-gray-500">
+                                            Private Access Only.
+                                        </p>
+                                    </div>
                                 </form>
                              )}
                         </div>
@@ -227,12 +343,44 @@ const LandingScreen: React.FC<{ onConfigSave: (config: FirebaseConfig) => void; 
                         <div className="animate-fade-in">
                              <h2 className="text-xl font-bold text-white mb-2">{t('setupTitle')}</h2>
                              <p className="text-gray-400 text-sm mb-4">{t('shareLinkInstructions')}</p>
+                             
                              <div className="space-y-4">
-                                <textarea className="w-full h-32 bg-gray-900 text-gray-200 p-3 rounded-lg border border-gray-600 font-mono text-xs" placeholder={t('firebaseConfigPlaceholder')} value={configStr} onChange={(e) => setConfigStr(e.target.value)}/>
-                                <input type="email" className="w-full bg-gray-900 text-gray-200 p-3 rounded-lg border border-gray-600" placeholder={t('adminEmailPlaceholder')} value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)}/>
-                                <input type="password" className="w-full bg-gray-900 text-gray-200 p-3 rounded-lg border border-gray-600" placeholder={t('passwordLabel')} value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)}/>
-                                <button onClick={handleConfigSubmit} disabled={loading} className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50">{loading ? 'Thinking...' : t('saveConfigButton')}</button>
-                                {systemConfigured && <button onClick={handleShare} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2"><ShareIcon className="w-5 h-5" />{t('shareLinkButton')}</button>}
+                                <textarea
+                                    className="w-full h-32 bg-gray-900 text-gray-200 p-3 rounded-lg border border-gray-600 font-mono text-xs"
+                                    placeholder={t('firebaseConfigPlaceholder')}
+                                    value={configStr}
+                                    onChange={(e) => setConfigStr(e.target.value)}
+                                />
+                                <input 
+                                    type="email"
+                                    className="w-full bg-gray-900 text-gray-200 p-3 rounded-lg border border-gray-600"
+                                    placeholder={t('adminEmailPlaceholder')}
+                                    value={adminEmail}
+                                    onChange={(e) => setAdminEmail(e.target.value)}
+                                />
+                                <input 
+                                    type="password"
+                                    className="w-full bg-gray-900 text-gray-200 p-3 rounded-lg border border-gray-600"
+                                    placeholder={t('passwordLabel')}
+                                    value={adminPassword}
+                                    onChange={(e) => setAdminPassword(e.target.value)}
+                                />
+                                <button
+                                    onClick={handleConfigSubmit}
+                                    disabled={loading}
+                                    className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50"
+                                >
+                                    {loading ? 'Thinking...' : t('saveConfigButton')}
+                                </button>
+                                {systemConfigured && (
+                                     <button
+                                        onClick={handleShare}
+                                        className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2"
+                                     >
+                                         <ShareIcon className="w-5 h-5" />
+                                         {t('shareLinkButton')}
+                                     </button>
+                                )}
                              </div>
                         </div>
                     )}
@@ -245,12 +393,50 @@ const LandingScreen: React.FC<{ onConfigSave: (config: FirebaseConfig) => void; 
 const PermissionErrorModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
         <div className="bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full border border-red-500/50 p-6">
-            <div className="flex justify-between items-start mb-4"><h3 className="text-xl font-bold text-red-400">⚠️ Database Permission Error</h3><button onClick={onClose}><CloseIcon className="w-6 h-6 text-gray-400"/></button></div>
-            <p className="text-gray-300 mb-4 text-sm">The app cannot read/write to the database. Check Firestore Rules.</p>
-            <button onClick={onClose} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg">I Fixed It</button>
+            <div className="flex justify-between items-start mb-4">
+                <h3 className="text-xl font-bold text-red-400">⚠️ Database Permission Error</h3>
+                <button onClick={onClose}><CloseIcon className="w-6 h-6 text-gray-400"/></button>
+            </div>
+            <p className="text-gray-300 mb-4 text-sm">
+                The app cannot read/write to the database. This usually means the Firestore Rules are not set correctly.
+            </p>
+            <ol className="list-decimal list-inside text-gray-400 text-sm mb-4 space-y-2">
+                <li>Go to <a href="https://console.firebase.google.com/" target="_blank" className="text-blue-400 hover:underline">Firebase Console</a> &gt; Firestore Database.</li>
+                <li>Click the <strong>Rules</strong> tab.</li>
+                <li>Replace the code with this:</li>
+            </ol>
+            <div className="bg-black p-3 rounded-md font-mono text-xs text-green-400 overflow-x-auto mb-4 border border-gray-700">
+                rules_version = '2';<br/>
+                service cloud.firestore {'{'}<br/>
+                &nbsp;&nbsp;match /databases/{'{'}database{'}'}/documents {'{'}<br/>
+                &nbsp;&nbsp;&nbsp;&nbsp;match /users/{'{'}userId{'}'} {'{'}<br/>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;allow read, write: if request.auth != null;<br/>
+                &nbsp;&nbsp;&nbsp;&nbsp;{'}'}<br/>
+                &nbsp;&nbsp;{'}'}<br/>
+                {'}'}
+            </div>
+            <button onClick={onClose} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg">
+                I Fixed It, Try Again
+            </button>
         </div>
     </div>
 );
+
+
+const getClosestAspectRatio = (width: number, height: number): '1:1' | '16:9' | '9:16' | '4:3' | '3:4' => {
+    const ratio = width / height;
+    const targets = [
+        { r: 1, val: '1:1' as const },
+        { r: 16/9, val: '16:9' as const },
+        { r: 9/16, val: '9:16' as const },
+        { r: 4/3, val: '4:3' as const },
+        { r: 3/4, val: '3:4' as const }
+    ];
+    // Find closest
+    return targets.reduce((prev, curr) => 
+        Math.abs(curr.r - ratio) < Math.abs(prev.r - ratio) ? curr : prev
+    ).val;
+}
 
 const App: React.FC = () => {
   const [lang, setLang] = useState<Language>('zh');
@@ -267,6 +453,7 @@ const App: React.FC = () => {
   const [brushColor, setBrushColor] = useState<string>('#ef4444');
   const [prompt, setPrompt] = useState<string>('');
   const [aspectRatio, setAspectRatio] = useState<string>('3:2');
+  const [resolution, setResolution] = useState<ImageResolution>('2K');
   const [allQuickPrompts, setAllQuickPrompts] = useState<Record<string, string[]>>({});
   const [apiResult, setApiResult] = useState<ApiResult>({ text: null, imageUrl: null });
   const [loading, setLoading] = useState<boolean>(false);
@@ -282,6 +469,7 @@ const App: React.FC = () => {
   const [isLayoutEditorOpen, setIsLayoutEditorOpen] = useState(false);
   const [editingImage, setEditingImage] = useState<UploadedImage | null>(null);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+  const [adminMsg, setAdminMsg] = useState('');
   const [showPermissionHelp, setShowPermissionHelp] = useState(false);
 
   const canvasRef = useRef<CanvasEditorRef>(null);
@@ -376,7 +564,6 @@ const App: React.FC = () => {
 
   const handleRefinePrompt = async () => {
     if (!prompt) return;
-    // Cost is 1 for refinement
     if (!userProfile || userProfile.credits < 1) { alert(t('notEnoughCredits')); return; }
 
     setIsRefining(true);
@@ -426,7 +613,6 @@ const App: React.FC = () => {
   };
 
   const handleGenerate = useCallback(async () => {
-    // Cost is 3 for generation
     const cost = 3;
     if (!prompt) { setError('Please enter a prompt.'); return; }
     if (!userProfile || userProfile.credits < cost) { setError(t('notEnoughCredits')); return; }
@@ -475,8 +661,6 @@ const App: React.FC = () => {
         
         const imagesToSend: GeminiImagePart[] = [baseImagePart];
         
-        // Add reference images logic if needed (omitted for brevity as per previous logic)
-        
         const editPrefix = "Edit instruction: ";
         const finalPrompt = `${editPrefix}${prompt}\n\n${t('instructionalPrompt')}`;
         
@@ -510,24 +694,24 @@ const App: React.FC = () => {
     }
   }, [selectedImage, prompt, uploadedImages, selectedImageId, t, apiResult.imageUrl, aspectRatio, userProfile]);
 
-  // Image handlers omitted for brevity, using existing logic
+  // Image & Canvas Handlers (Same as before)
   const handleFiles = useCallback((files: FileList) => {
-      const filesArray = Array.from(files).filter(file => file.type.startsWith('image/'));
-      if(filesArray.length === 0) return;
-      const newImages: UploadedImage[] = [];
-      let loadedCount = 0;
-      filesArray.forEach(file => {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-              newImages.push({ id: `${file.name}-${Date.now()}`, file, dataUrl: e.target?.result as string });
-              loadedCount++;
-              if(loadedCount === filesArray.length) {
-                  setUploadedImages(prev => [...prev, ...newImages]);
-                  if(!selectedImageId && newImages.length > 0) setSelectedImageId(newImages[0].id);
-              }
-          }
-          reader.readAsDataURL(file);
-      })
+    const filesArray = Array.from(files).filter(file => file.type.startsWith('image/'));
+    if (filesArray.length === 0) return;
+    const newImages: UploadedImage[] = [];
+    let loadedCount = 0;
+    filesArray.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        newImages.push({ id: `${file.name}-${Date.now()}`, file, dataUrl: event.target?.result as string });
+        loadedCount++;
+        if (loadedCount === filesArray.length) {
+          setUploadedImages(prev => [...prev, ...newImages]);
+          if (!selectedImageId && newImages.length > 0) setSelectedImageId(newImages[0].id);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
   }, [selectedImageId]);
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) { handleFiles(e.target.files); e.target.value = ''; } };
   const handleUploadClick = () => fileInputRef.current?.click();
@@ -538,38 +722,87 @@ const App: React.FC = () => {
         const remaining = uploadedImages.filter(img => img.id !== id);
         setSelectedImageId(remaining.length > 0 ? remaining[0].id : null);
         setApiResult({ text: null, imageUrl: null });
+        setError(null);
+        setWarning(null);
     }
   }
-  const handleImageReorder = (reordered: UploadedImage[]) => setUploadedImages(reordered);
-  const handleClearResult = () => { setApiResult({ text: null, imageUrl: null }); setError(null); };
-
-  // Pan/Zoom helpers
+  const handleImageReorder = (reorderedImages: UploadedImage[]) => setUploadedImages(reorderedImages);
+  const handleClearResult = () => { setApiResult({ text: null, imageUrl: null }); setError(null); setWarning(null); };
+  
+  // Reuse existing helpers
   const handlePanByControl = useCallback((dx: number, dy: number) => { setPan(p => ({ x: p.x + dx, y: p.y + dy })); }, []);
-  const handlePanStart = useCallback((clientX: number, clientY: number) => { if (!imageContainerRef.current) return; panStartRef.current = { startX: clientX, startY: clientY, startPan: pan }; setIsPanning(true); }, [pan]);
-  const handlePanMove = useCallback((clientX: number, clientY: number) => { if (!isPanning) return; setPan({ x: panStartRef.current.startPan.x + (clientX - panStartRef.current.startX), y: panStartRef.current.startPan.y + (clientY - panStartRef.current.startY) }); }, [isPanning]);
+  // Removed wheel zooming on canvas to prevent view layout issues, per user request. Zooming is now handled via the controls only.
+  const handlePanStart = useCallback((clientX: number, clientY: number) => {
+    if (!imageContainerRef.current) return;
+    panStartRef.current = { startX: clientX, startY: clientY, startPan: pan };
+    setIsPanning(true);
+  }, [pan]);
+  const handlePanMove = useCallback((clientX: number, clientY: number) => {
+    if (!isPanning) return;
+    setPan({ x: panStartRef.current.startPan.x + (clientX - panStartRef.current.startX), y: panStartRef.current.startPan.y + (clientY - panStartRef.current.startY) });
+  }, [isPanning]);
   const handlePanEnd = useCallback(() => setIsPanning(false), []);
   const resetView = useCallback(() => { fitImageToScreen(); }, [fitImageToScreen]);
-
-  // ... (Touch/Mouse event handlers passed to main div) ... 
   const onMouseDown = (e: React.MouseEvent) => { if (e.button !== 0) return; e.preventDefault(); handlePanStart(e.clientX, e.clientY); };
   const onMouseMove = (e: React.MouseEvent) => { e.preventDefault(); handlePanMove(e.clientX, e.clientY); };
-  const onMouseUp = () => handlePanEnd();
-  
   const onTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 1) {
-       handlePanStart(e.touches[0].clientX, e.touches[0].clientY);
-    }
+    if (e.touches.length === 2) {
+      setIsPanning(false);
+      const t1 = e.touches[0]; const t2 = e.touches[1];
+      pinchStartRef.current = { dist: Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY), mid: { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 }, zoom: zoom, pan: pan };
+    } else if (e.touches.length === 1) { pinchStartRef.current = null; handlePanStart(e.touches[0].clientX, e.touches[0].clientY); }
   };
   const onTouchMove = (e: React.TouchEvent) => {
-      if (e.touches.length === 1) {
-         handlePanMove(e.touches[0].clientX, e.touches[0].clientY);
+    if (e.touches.length === 2 && pinchStartRef.current) {
+      e.preventDefault();
+      const t1 = e.touches[0]; const t2 = e.touches[1];
+      const newDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      const scale = newDist / pinchStartRef.current.dist;
+      const newZoom = Math.max(0.1, Math.min(10, pinchStartRef.current.zoom * scale));
+      if (imageContainerRef.current) {
+          const rect = imageContainerRef.current.getBoundingClientRect();
+          const startMidOnScreen = { x: pinchStartRef.current.mid.x - rect.left, y: pinchStartRef.current.mid.y - rect.top };
+          const worldPoint = { x: (startMidOnScreen.x - pinchStartRef.current.pan.x) / pinchStartRef.current.zoom, y: (startMidOnScreen.y - pinchStartRef.current.pan.y) / pinchStartRef.current.zoom };
+          const newMid = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+          const newMidOnScreen = { x: newMid.x - rect.left, y: newMid.y - rect.top };
+          const newPan = { x: newMidOnScreen.x - worldPoint.x * newZoom, y: newMidOnScreen.y - worldPoint.y * newZoom };
+          setZoom(newZoom); setPan(newPan);
       }
+    } else if (e.touches.length === 1 && isPanning) { handlePanMove(e.touches[0].clientX, e.touches[0].clientY); }
   };
-  const onTouchEnd = () => handlePanEnd();
+  const onTouchEnd = (e: React.TouchEvent) => { handlePanEnd(); if (e.touches.length < 2) pinchStartRef.current = null; if (e.touches.length === 1) handlePanStart(e.touches[0].clientX, e.touches[0].clientY); };
   
-  // Handlers passed to components
-  const handleEditResult = () => { /* ... existing logic ... */ if(!apiResult.imageUrl) return; /* convert to blob/file and add to images */ };
-  const handleLayoutComplete = (dataUrl: string) => { /* ... */ };
+  const handleEditResult = () => {
+    if (!apiResult.imageUrl) return;
+    try {
+      const dataUrl = apiResult.imageUrl;
+      const parts = dataUrl.split(',');
+      const mimeString = parts[0].split(':')[1].split(';')[0];
+      const extension = mimeString.split('/')[1] || 'png';
+      const byteString = atob(parts[1]);
+      const arrayBuffer = new ArrayBuffer(byteString.length);
+      const intArray = new Uint8Array(arrayBuffer);
+      for (let i = 0; i < byteString.length; i++) intArray[i] = byteString.charCodeAt(i);
+      const blob = new Blob([arrayBuffer], { type: mimeString });
+      const filename = `result-${Date.now()}.${extension}`;
+      const file = new File([blob], filename, { type: mimeString });
+      const newImage: UploadedImage = { id: `${file.name}-${Date.now()}`, file, dataUrl: dataUrl };
+      setUploadedImages(prev => [...prev, newImage]);
+      setSelectedImageId(newImage.id);
+      setApiResult({ text: null, imageUrl: null });
+      setError(null);
+      setWarning(null);
+    } catch (e) { console.error(e); setError("Could not load result image."); }
+  };
+
+  const handleLayoutComplete = (dataUrl: string) => {
+      const mime = dataUrl.match(/:(.*?);/)?.[1] || 'image/png';
+      const file = new File([new Blob([new Uint8Array(0)])], `layout-${Date.now()}`, { type: mime });
+      const newImage = { id: `${Date.now()}`, file, dataUrl };
+      setUploadedImages(prev => [...prev, newImage]);
+      setSelectedImageId(newImage.id);
+      setIsLayoutEditorOpen(false);
+  }
   const handleOpenPhotoEditor = (id: string) => { const img = uploadedImages.find(i => i.id === id); if (img) setEditingImage(img); };
   const handleSavePhotoEditor = (id: string, dataUrl: string) => { setUploadedImages(prev => prev.map(img => img.id === id ? { ...img, dataUrl } : img)); setEditingImage(null); };
 
@@ -581,7 +814,16 @@ const App: React.FC = () => {
       {showKeyModal && <ApiKeyWelcomeModal onSave={handleSaveApiKey} t={t} />}
       {showPermissionHelp && <PermissionErrorModal onClose={() => setShowPermissionHelp(false)} />}
       {isLayoutEditorOpen && <LayoutEditor onComplete={handleLayoutComplete} onClose={() => setIsLayoutEditorOpen(false)} t={t} />}
-      {editingImage && <PhotoEditor image={editingImage} onSave={handleSavePhotoEditor} onClose={() => setEditingImage(null)} t={t} userCredits={userProfile?.credits || 0} onDeductCredits={handleDeductCredits} />}
+      {editingImage && (
+        <PhotoEditor 
+            image={editingImage} 
+            onSave={handleSavePhotoEditor} 
+            onClose={() => setEditingImage(null)} 
+            t={t} 
+            userCredits={userProfile?.credits || 0}
+            onDeductCredits={handleDeductCredits}
+        />
+      )}
 
       <div className="container mx-auto p-4 lg:p-8">
         <header className="mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
@@ -589,7 +831,7 @@ const App: React.FC = () => {
                 <h1 className="text-4xl lg:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">
                     {t('title')} 
                     <span className="text-xs bg-gray-800 text-gray-400 px-2 py-1 rounded border border-gray-600 align-middle ml-2">
-                        Gemini 2.5 (v2025.11.30 Platform)
+                        Gemini 2.5 (v2025.11.30 Release)
                         {isCustomKey ? <span className="text-green-400 ml-1">● Custom Key</span> : <span className="text-yellow-500 ml-1">● Default</span>}
                     </span>
                 </h1>
@@ -603,9 +845,15 @@ const App: React.FC = () => {
                         <SparklesIcon className="w-4 h-4" /> {userProfile?.credits || 0} {t('creditsLabel')}
                     </span>
                 </div>
-                <button onClick={() => logout()} className="text-xs bg-red-900/50 hover:bg-red-900 text-red-200 px-2 py-1 rounded">{t('logoutButton')}</button>
+                <button onClick={() => logout()} className="text-xs bg-red-900/50 hover:bg-red-900 text-red-200 px-2 py-1 rounded">
+                    {t('logoutButton')}
+                </button>
                 <div className="flex gap-2 border-l border-gray-600 pl-4">
-                    <button onClick={handleChangeKey} className={`p-1 transition-colors ${isCustomKey ? 'text-green-400 hover:text-green-300' : 'text-gray-400 hover:text-white'}`} title="Change API Key">
+                    <button 
+                        onClick={handleChangeKey} 
+                        className={`p-1 transition-colors ${isCustomKey ? 'text-green-400 hover:text-green-300' : 'text-gray-400 hover:text-white'}`} 
+                        title={isCustomKey ? "Using Custom Key (Click to Change)" : "Using Default Key (Click to Set Custom)"}
+                    >
                         <KeyIcon className="w-5 h-5" />
                     </button>
                     <button onClick={() => setLang('en')} className={`px-2 py-1 text-xs rounded-md ${lang === 'en' ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}>EN</button>
@@ -614,17 +862,23 @@ const App: React.FC = () => {
             </div>
         </header>
 
+        {/* Admin Panel */}
         {userProfile?.isAdmin && (
             <div className="mb-6 bg-blue-900/20 border border-blue-500/30 p-4 rounded-lg">
                 <div className="flex justify-between items-center cursor-pointer" onClick={() => setIsAdminPanelOpen(!isAdminPanelOpen)}>
                     <h3 className="font-bold text-blue-300 flex items-center gap-2"><UserCircleIcon className="w-5 h-5"/> {t('adminPanelTitle')}</h3>
                     <span className="text-xl">{isAdminPanelOpen ? '−' : '+'}</span>
                 </div>
-                {isAdminPanelOpen && <div className="mt-4 animate-fade-in"><AdminUserList t={t} onCreditsUpdated={refreshUserProfile} /></div>}
+                {isAdminPanelOpen && (
+                    <div className="mt-4 animate-fade-in">
+                        <AdminUserList t={t} onCreditsUpdated={refreshUserProfile} />
+                    </div>
+                )}
             </div>
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left Column */}
           <div className="flex flex-col gap-4 bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700">
              <div className="flex flex-wrap justify-between items-center gap-2">
               <div className="flex items-center gap-4">
@@ -632,58 +886,150 @@ const App: React.FC = () => {
                     {apiResult.imageUrl && !loading ? t('resultTitle') : t('canvasTitle')}
                   </h2>
                   {!apiResult.imageUrl && !loading && selectedImage && (
-                        <ZoomControls zoom={zoom} onZoomChange={setZoom} onFit={fitImageToScreen} t={t} isPanMode={isPanMode} onTogglePan={() => setIsPanMode(!isPanMode)} />
+                        <ZoomControls 
+                            zoom={zoom} 
+                            onZoomChange={setZoom} 
+                            onFit={fitImageToScreen} 
+                            t={t} 
+                            isPanMode={isPanMode}
+                            onTogglePan={() => setIsPanMode(!isPanMode)}
+                        />
                   )}
               </div>
+
               {apiResult.imageUrl && !loading && (
-                <button onClick={handleClearResult} className="flex items-center gap-2 bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg"><RedrawIcon className="w-4 h-4"/> {t('backToEditorButton')}</button>
+                <button onClick={handleClearResult} className="flex items-center gap-2 bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg">
+                    <RedrawIcon className="w-4 h-4"/> {t('backToEditorButton')}
+                </button>
               )}
             </div>
 
             {apiResult.imageUrl || loading ? (
-                 <ResultDisplay loading={loading} error={error} apiResult={apiResult} t={t} onEditResult={handleEditResult} originalImageSrc={selectedImage?.dataUrl || null} />
+                 <ResultDisplay
+                    loading={loading}
+                    error={error}
+                    apiResult={apiResult}
+                    t={t}
+                    onEditResult={handleEditResult}
+                    originalImageSrc={selectedImage?.dataUrl || null}
+                 />
             ) : (
-                 <div 
-                    className={`relative w-full aspect-[4/3] bg-gray-900 rounded-lg overflow-hidden border-2 border-dashed border-gray-700 group ${isPanMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}
-                    ref={imageContainerRef}
-                    onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}
-                    onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
-                 >
+                // Canvas View
+                 <div className={`relative w-full aspect-[4/3] bg-gray-900 rounded-lg overflow-hidden border-2 border-dashed border-gray-700 group ${isPanMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}>
+                    <div 
+                        ref={imageContainerRef}
+                        className="w-full h-full flex items-center justify-center overflow-hidden touch-none"
+                        onMouseDown={onMouseDown}
+                        onMouseMove={onMouseMove}
+                        onMouseUp={() => setIsPanning(false)}
+                        onMouseLeave={() => setIsPanning(false)}
+                        onTouchStart={onTouchStart}
+                        onTouchMove={onTouchMove}
+                        onTouchEnd={onTouchEnd}
+                        // Removed onWheel to prevent zooming via mouse wheel
+                    >
                     {!selectedImage ? (
                         <div className="flex flex-col items-center text-gray-500 cursor-pointer hover:text-gray-400 transition-colors" onClick={handleUploadClick}>
-                            <UploadIcon className="w-16 h-16 mb-4" /><p className="text-lg font-medium">{t('uploadTitle')}</p><p className="text-sm">{t('uploadSubtitle')}</p>
+                            <UploadIcon className="w-16 h-16 mb-4" />
+                            <p className="text-lg font-medium">{t('uploadTitle')}</p>
+                            <p className="text-sm">{t('uploadSubtitle')}</p>
                         </div>
                     ) : (
                         <div style={{ transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`, transition: isPanning || pinchStartRef.current ? 'none' : 'transform 0.1s ease-out' }} className="relative">
-                            <CanvasEditor ref={canvasRef} imageSrc={selectedImage.dataUrl} brushSize={brushSize} brushColor={brushColor} enableDrawing={!isPanMode} />
+                            <CanvasEditor
+                                ref={canvasRef}
+                                imageSrc={selectedImage.dataUrl}
+                                brushSize={brushSize}
+                                brushColor={brushColor}
+                                enableDrawing={!isPanMode}
+                            />
                         </div>
                     )}
-                    <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" multiple className="hidden" />
+                    </div>
+                     <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                    />
                 </div>
             )}
 
-            {!apiResult.imageUrl && <Toolbar brushSize={brushSize} onBrushSizeChange={setBrushSize} brushColor={brushColor} onBrushColorChange={setBrushColor} onClear={() => canvasRef.current?.reset()} t={t} />}
+            {/* Toolbar for Canvas */}
+            {!apiResult.imageUrl && (
+                <Toolbar
+                    brushSize={brushSize}
+                    onBrushSizeChange={setBrushSize}
+                    brushColor={brushColor}
+                    onBrushColorChange={setBrushColor}
+                    onClear={() => canvasRef.current?.reset()}
+                    t={t}
+                />
+            )}
             
-            <ThumbnailManager images={uploadedImages} selectedImageId={selectedImageId} onSelect={handleImageSelect} onDelete={handleImageDelete} onAddImage={handleUploadClick} onReorder={handleImageReorder} onEdit={handleOpenPhotoEditor} onOpenLayoutEditor={() => setIsLayoutEditorOpen(true)} t={t} />
+            {/* Thumbnails */}
+            <ThumbnailManager
+                images={uploadedImages}
+                selectedImageId={selectedImageId}
+                onSelect={handleImageSelect}
+                onDelete={handleImageDelete}
+                onAddImage={handleUploadClick}
+                onReorder={handleImageReorder}
+                onEdit={handleOpenPhotoEditor}
+                onOpenLayoutEditor={() => setIsLayoutEditorOpen(true)}
+                t={t}
+            />
           </div>
 
+          {/* Right Column */}
           <div className="flex flex-col gap-6">
             <div className="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700 flex flex-col gap-4">
                  <div className="flex justify-between items-center">
-                    <label className="block text-sm font-medium text-gray-300"><span className="flex items-center gap-2"><SparklesIcon className="w-4 h-4 text-purple-400" />{t('promptLabel')}</span></label>
-                    <button onClick={handleRefinePrompt} disabled={!prompt || isRefining} className="text-xs bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/30 px-3 py-1.5 rounded-full transition-all flex items-center gap-1 disabled:opacity-50">
-                        {isRefining ? t('refiningButton') : t('enhancePromptButton')}
-                    </button>
+                    <label className="block text-sm font-medium text-gray-300">
+                        <span className="flex items-center gap-2">
+                            <SparklesIcon className="w-4 h-4 text-purple-400" />
+                            {t('promptLabel')}
+                        </span>
+                    </label>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleRefinePrompt}
+                            disabled={!prompt || isRefining}
+                            className="text-xs bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/30 px-3 py-1.5 rounded-full transition-all flex items-center gap-1 disabled:opacity-50"
+                        >
+                            {isRefining ? t('refiningButton') : t('enhancePromptButton')}
+                        </button>
+                    </div>
                 </div>
                 
-              <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={selectedImage ? t('promptPlaceholder') : t('textToImagePromptPlaceholder')} className="w-full h-32 p-4 bg-gray-900 border border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none text-gray-200 placeholder-gray-500 transition-all text-sm leading-relaxed" />
-              {!selectedImage && <p className="text-xs text-gray-500 italic">{t('textToImagePromptHelperText')}</p>}
-              {selectedImage && <p className="text-xs text-gray-500 italic">{t('promptHelperText')}</p>}
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder={selectedImage ? t('promptPlaceholder') : t('textToImagePromptPlaceholder')}
+                className="w-full h-32 p-4 bg-gray-900 border border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none text-gray-200 placeholder-gray-500 transition-all text-sm leading-relaxed"
+              />
+              
+              {!selectedImage && (
+                   <p className="text-xs text-gray-500 italic">
+                        {t('textToImagePromptHelperText')}
+                   </p>
+              )}
+               {selectedImage && (
+                   <p className="text-xs text-gray-500 italic">
+                        {t('promptHelperText')}
+                   </p>
+              )}
 
               <div className="grid grid-cols-1 gap-4">
                   <div>
                       <label className="block text-xs font-medium text-gray-400 mb-1">{t('aspectRatioLabel')}</label>
-                      <select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-purple-500 focus:border-purple-500 block p-2.5">
+                      <select
+                        value={aspectRatio}
+                        onChange={(e) => setAspectRatio(e.target.value)}
+                        className="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-purple-500 focus:border-purple-500 block p-2.5"
+                      >
                          <option value="1:1">{t('ratio11')}</option>
                          <option value="3:2">{t('ratio32')}</option>
                          <option value="4:3">{t('ratio43')}</option>
@@ -693,17 +1039,70 @@ const App: React.FC = () => {
                          <option value="9:16">{t('ratio916')}</option>
                       </select>
                   </div>
-                  <div className="text-right mt-1"><span className="text-xs text-yellow-500 font-bold">{t('cost1K')}</span></div>
+                  <div className="text-right mt-1">
+                       <span className="text-xs text-yellow-500 font-bold">
+                           {t('cost1K')}
+                       </span>
+                  </div>
               </div>
 
-              <button onClick={handleGenerate} disabled={loading || (!selectedImage && !prompt)} className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2 ${loading ? 'bg-gray-600 cursor-not-allowed text-gray-400' : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white'}`}>
-                {loading ? <>{t('generatingButton')}</> : <><SparklesIcon className="w-6 h-6" />{t('generateButton')}</>}
+              <button
+                onClick={handleGenerate}
+                disabled={loading || (!selectedImage && !prompt)}
+                className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2
+                  ${loading 
+                    ? 'bg-gray-600 cursor-not-allowed text-gray-400' 
+                    : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white'
+                  }`}
+              >
+                {loading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    {t('generatingButton')}
+                  </>
+                ) : (
+                  <>
+                    <SparklesIcon className="w-6 h-6" />
+                    {t('generateButton')}
+                  </>
+                )}
               </button>
 
-              {warning && <div className="p-3 bg-yellow-900/30 border border-yellow-500/50 rounded-xl text-yellow-200 text-sm animate-fade-in"><p className="font-bold flex items-center gap-2">⚠️ Note</p><p className="mt-1">{warning}</p></div>}
-              {error && <div className="p-4 bg-red-900/30 border border-red-500/50 rounded-xl text-red-200 text-sm"><p className="font-bold flex items-center gap-2">⚠️ {t('errorTitle')}</p><p className="mt-1">{error}</p></div>}
+              {warning && (
+                  <div className="p-3 bg-yellow-900/30 border border-yellow-500/50 rounded-xl text-yellow-200 text-sm animate-fade-in">
+                      <p className="font-bold flex items-center gap-2">
+                          <span className="text-xl">⚠️</span> Note / 備註
+                      </p>
+                      <p className="mt-1 mb-2">{warning}</p>
+                  </div>
+              )}
+
+              {error && (
+                <div className="p-4 bg-red-900/30 border border-red-500/50 rounded-xl text-red-200 text-sm">
+                  <p className="font-bold flex items-center gap-2">
+                    <span className="text-xl">⚠️</span> {t('errorTitle')}
+                  </p>
+                  <p className="mt-1">{error}</p>
+                   {error === 'PERMISSION_DENIED_UI' && (
+                        <p className="mt-2 text-xs text-red-300">
+                             Tip: Check your API Key permissions or quota.
+                        </p>
+                   )}
+                </div>
+              )}
             </div>
-            <div className="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700 flex-grow overflow-y-auto max-h-[500px]"><QuickPrompts prompts={allQuickPrompts} onPromptClick={setPrompt} onPromptsChange={setAllQuickPrompts} t={t} /></div>
+
+            <div className="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700 flex-grow overflow-y-auto max-h-[500px]">
+                 <QuickPrompts
+                    prompts={allQuickPrompts}
+                    onPromptClick={setPrompt}
+                    onPromptsChange={setAllQuickPrompts}
+                    t={t}
+                />
+            </div>
           </div>
         </div>
       </div>
