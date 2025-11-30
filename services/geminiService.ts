@@ -5,7 +5,7 @@ import type { GeminiImagePart } from '../types';
 const DEFAULT_FALLBACK_KEY = "AIzaSyCeR52YbrlvyOqk8-cOyTwEVZ9TYRrbdCg";
 
 // Dynamic retrieval function
-const getActiveKey = (): string => {
+export const getActiveKey = (): string => {
     try {
         const custom = localStorage.getItem('custom_gemini_api_key');
         if (custom && custom.trim().length > 10) {
@@ -18,19 +18,20 @@ const getActiveKey = (): string => {
     return DEFAULT_FALLBACK_KEY;
 };
 
-const handleGeminiError = (error: unknown, context: string): never => {
+const handleGeminiError = (error: unknown, context: string, keySuffix: string): never => {
   console.error(`Error calling ${context}:`, error);
+  let errorMessage = 'An unknown error occurred';
+  
   if (error instanceof Error) {
-    const msg = error.message;
-    if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')) {
-      throw new Error('RATE_LIMIT_EXCEEDED');
+    errorMessage = error.message;
+    if (errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('429')) {
+      throw new Error(`RATE_LIMIT_EXCEEDED (Key: ...${keySuffix})`);
     }
-    if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) {
-      throw new Error('PERMISSION_DENIED');
+    if (errorMessage.includes('PERMISSION_DENIED') || errorMessage.includes('403')) {
+      throw new Error(`PERMISSION_DENIED (Key: ...${keySuffix})`);
     }
-    throw new Error(`${context} Error: ${msg}`);
   }
-  throw new Error(`An unknown error occurred while communicating with the ${context}.`);
+  throw new Error(`${context} Error: ${errorMessage} (Key: ...${keySuffix})`);
 };
 
 // Gemini 2.5 Flash Image Generation
@@ -40,6 +41,7 @@ export const generateImageWithGemini = async (
 ): Promise<{ imageUrl: string }> => {
   
   const apiKey = getActiveKey();
+  const keySuffix = apiKey.slice(-4);
   const ai = new GoogleGenAI({ apiKey });
   
   const extractImage = (response: any) => {
@@ -74,7 +76,7 @@ export const generateImageWithGemini = async (
     return { imageUrl: img };
 
   } catch (error: any) {
-     handleGeminiError(error, "Gemini 2.5 Image API");
+     handleGeminiError(error, "Gemini 2.5 Image API", keySuffix);
   }
 };
 
@@ -84,6 +86,7 @@ export const editImageWithGemini = async (
   prompt: string
 ): Promise<{ response: GenerateContentResponse }> => {
   const apiKey = getActiveKey();
+  const keySuffix = apiKey.slice(-4);
   const ai = new GoogleGenAI({ apiKey });
 
   const imageParts = images.map(image => ({
@@ -102,7 +105,7 @@ export const editImageWithGemini = async (
     return { response };
 
   } catch (error: any) {
-      handleGeminiError(error, "Gemini 2.5 API");
+      handleGeminiError(error, "Gemini 2.5 API", keySuffix);
   }
 };
 
@@ -113,6 +116,7 @@ export const refinePrompt = async (
     language: string = 'en'
 ): Promise<string> => {
   const apiKey = getActiveKey();
+  const keySuffix = apiKey.slice(-4);
   const ai = new GoogleGenAI({ apiKey });
   try {
     let systemInstruction = "";

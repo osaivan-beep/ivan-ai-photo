@@ -1,5 +1,8 @@
 
-// ... (keep existing prompts arrays - zhBirdsPrompts, enBirdsPrompts etc. - assume they are here) ...
+// ... (previous prompts arrays remain unchanged) ...
+// ... (zhBirdsPrompts, enBirdsPrompts, etc.) ...
+
+// ... (keeping prompts arrays to save space) ...
 const zhBirdsPrompts = [
     "圖1的鳥站在圖2的樹藤上 樹藤底下裸空",
     "圖1與圖2的鳥,是一對恩愛情侶,頭上羽毛澎起,站在圖3的樹藤上",
@@ -20,154 +23,14 @@ const zhBirdsPrompts = [
     "根據圖中的主題與背景重新創作成專業電影海報風格(歐美風),主題的外型與風格清晰度要維持(與背景要自然融合),背景與光影可創作改變,最後根據創作好的圖,在圖上填入中文標題(字型要符合圖的氛圍,字不要太大,避免搶過主題),適當的位置填入根據創作圖的簡單故事說明(有詩人氣質語法,字不要太大),並且在左下方適當處加入簽名文字(伊凡 Ai photo)",
     "將圖1的鳥改成圖2的飛行姿勢,綠色樹林模糊背景",
 ];
+const enBirdsPrompts = ["Bird in image 1 is standing on the vine from image 2...", "The birds from image 1 and 2 are a loving couple...", "The bird from image 2 flies in the upper right...", "Replace image 1 with image 2...", "Background references image 1's style...", "Bird is standing on a green mossy rock...", "Bird is standing on a pine tree in snow...", "Blur the background into a green forest bokeh", "Bird is standing on a green mossy branch...", "Super large aperture photography...", "Turn this blurry image into a high-definition image...", "Bird in image 1 is in the middle-right of image 2...", "Next to the bird is a shallow stream...", "Panning photography...", "Change the bird in image 1 to the flying posture...", "Transform Image 1 into a Chinese ink painting style...", "Recreate as a professional movie poster...", "Change the bird in image 1 to the flying posture..."];
+const zhSceneryPrompts = ["天空增加火燒雲彩霞主題的色溫也要改變", "夜晚螺旋同心圓星空...", "背景是冰湖旁的極光...", "把白天變成星空閃爍的夜晚", "在天空中畫一道彩虹", "天空中有流星雨", "添加一些戲劇性的暴風雲", "將季節改為下雪的冬天", "紅線內有雲海流動", "遠處有一座中世紀城堡", "在背景中加入一座宏偉的瀑布", "讓地面上長出發光的蘑菇", "紅線內有太陽星芒", "把它變成一個奇幻景觀", "讓場景看起來像是在外星球", "將背景轉換為美麗的海灘", "背景模糊化綠樹林散景", "用森林場景創建雙重曝光效果"];
+const enSceneryPrompts = ["Add sunset clouds...", "Night sky with spiral concentric stars...", "Background is aurora...", "Change daytime to a sparkling night sky", "Draw a rainbow in the sky", "Add a meteor shower...", "Add some dramatic storm clouds", "Change the season to a snowy winter", "Add a flowing sea of clouds", "Add a medieval castle...", "Add a magnificent waterfall...", "Make glowing mushrooms grow...", "Add a sun starburst effect", "Turn it into a fantasy landscape", "Make the scene look like it's on an alien planet", "Change the background to a beautiful beach", "Blur the background into a green forest bokeh", "Create a double exposure effect..."];
+const zhPortraitPrompts = ["讓圖1的角色, 依序擺成圖2的姿勢...", "讓圖1與圖2的兩人擺出圖3的pose...", "將圖1的人和圖2的人合成在同一畫面...", "把圖1人物的姿勢改成圖2的姿勢", "讓畫面中的人複製出2份...", "將照片中的人變成未來感十足的機器人形象...", "讓照片中的女人穿上傳統古裝...", "讓人穿上未來科技感的服裝", "這個人除頭部外, 全身變成被火焰包圍的惡靈騎士", "給主體戴上一副太陽眼鏡", "為人物加上翅膀", "在人物肩膀上加一隻小寵物", "將她的臉瘦一點, 皮膚好一點...", "如果這個人突然發大財會怎樣", "保留中間的人物主體, 刪除身邊的所有路人", "根據圖中的主題與背景重新創作成專業電影海報風格...", "背景換成在西藏的湖邊, 有雪山", "高空視角, 這個人腳下走鋼絲..."];
+const enPortraitPrompts = ["Arrange the character from image 1...", "Have the two people from image 1 and image 2 strike the pose...", "Combine the person from image 1 and the person from image 2...", "Change the pose of the person in image 1...", "Duplicate the person in the image twice...", "Transform the person in the photo into a futuristic robot...", "Have the woman in the photo wear traditional ancient clothing...", "Have the person wear futuristic, tech-inspired clothing.", "Except for the head, turn this person's entire body into a Ghost Rider...", "Put a pair of sunglasses on the subject.", "Add wings to the person.", "Add a small pet on the person's shoulder.", "Make her face a bit thinner...", "What if this person suddenly became very wealthy?", "Keep the main person in the middle...", "Recreate as a professional movie poster...", "Change the background to a lakeside...", "High-angle view..."];
+const zhComprehensivePrompts = ["完全去除雜訊...", "自動修圖,調整曝光度...", "去除不必要的雜枝...", "自動修圖,下午時候拍攝自然光影...", "畫面變亮, 變清晰...", "荷蘭 Lars van de Goor 攝影風格", "背景換成平移追焦攝影...", "超大光圈攝影...", "超大光圈攝影 穿透過櫻花...", "超寫實風格，8K高清畫質...", "主題清楚,外型姿勢不變, 單眼相機後簾快門...", "套用霓虹、賽博龐克風格", "模擬這張圖的彩繪創作...", "中國水墨畫風格...", "產生薄薄雲霧飄渺...", "讓主題周圍變暗...", "主題清楚,外型姿勢不變...", "繪圖1加上類似圖2這種手繪風格的塗鴉..."];
+const enComprehensivePrompts = ["Completely remove noise...", "Auto retouch: adjust exposure...", "Remove unnecessary branches...", "Auto retouch for afternoon natural light...", "Make the picture brighter...", "In the style of Dutch photographer...", "Change background to a panning shot...", "Super large aperture photography...", "Super large aperture photography, shooting through cherry blossoms...", "Hyper-realistic style, 8K HD...", "Subject clear, pose unchanged...", "Apply a neon, cyberpunk style", "Simulate a colored drawing...", "Chinese ink painting style...", "Create a thin, ethereal mist...", "Darken surroundings...", "Subject clear, pose unchanged...", "Add hand-drawn style graffiti..."];
 
-const enBirdsPrompts = [
-    "Bird in image 1 is standing on the vine from image 2, with empty space under the vine",
-    "The birds from image 1 and 2 are a loving couple, feathers on their heads are puffed up, standing on the vine from image 3",
-    "The bird from image 2 flies in the upper right of image 1",
-    "Replace image 1 with image 2, referencing image 2 to recreate image 1's text content and style (simple text, mixed Chinese/English, artistic design), add 'Ivan Ai photo' handwritten signature at bottom left, 9:16 format",
-    "Background references image 1's style, recreate and merge with the subject, feather the edges of the bird from image 2, keep head and body clear, best position is from image 2, leave more white space in the background",
-    "Bird is standing on a green mossy rock, background is a green forest bokeh",
-    "Bird is standing on a pine tree in snow, posture unchanged",
-    "Blur the background into a green forest bokeh",
-    "Bird is standing on a green mossy branch, posture unchanged, background is green forest bokeh",
-    "Super large aperture photography, shooting through green leaves, subject remains clear, surrounded by dreamy green blur",
-    "Turn this blurry image into a high-definition image, keeping the original aspect ratio. Make the foreground owl extremely sharp, restoring the bird's feather details and clear textures, with a blurred background.",
-    "Bird in image 1 is in the middle-right of image 2, fill the frame, bird's posture unchanged, auto-adjust image quality, like a professional camera with large aperture lens on a sunny day, bird is clear, rich in detail, dreamy blurred background",
-    "Next to the bird is a shallow stream with a small waterfall and mossy stones",
-    "Panning photography, bird is very clear, posture unchanged, background has super motion blur and ghosting, super slow shutter speed",
-    "Change the bird in image 1 to the flying posture of image 2, green forest blurred background",
-    "Transform Image 1 into a Chinese ink painting style, with plenty of white space, a red seal reading 'Ivan Ink', and add a five-character quatrain poem based on the image in handwritten calligraphy at an appropriate spot. Keep the bird's original style and clarity.",
-    "Recreate as a professional movie poster in Western style. Maintain subject clarity/shape (blend naturally). Creative changes to background/lighting allowed. Add a Chinese title (font fitting atmosphere, not too big), a brief poetic story description (font fitting atmosphere, not too big), and sign 'Ivan Ai photo' at the bottom left.",
-    "Change the bird in image 1 to the flying posture of image 2, green forest blurred background",
-];
-
-const zhSceneryPrompts = [
-    "天空增加火燒雲彩霞主題的色溫也要改變",
-    "夜晚螺旋同心圓星空,主題的色溫也改變",
-    "背景是冰湖旁的極光,主題的色溫與光影也改變成夜晚",
-    "把白天變成星空閃爍的夜晚",
-    "在天空中畫一道彩虹",
-    "天空中有流星雨",
-    "添加一些戲劇性的暴風雲",
-    "將季節改為下雪的冬天",
-    "紅線內有雲海流動",
-    "遠處有一座中世紀城堡",
-    "在背景中加入一座宏偉的瀑布",
-    "讓地面上長出發光的蘑菇",
-    "紅線內有太陽星芒",
-    "把它變成一個奇幻景觀",
-    "讓場景看起來像是在外星球",
-    "將背景轉換為美麗的海灘",
-    "背景模糊化綠樹林散景",
-    "用森林場景創建雙重曝光效果"
-];
-
-const enSceneryPrompts = [
-    "Add sunset clouds, also change the theme's color temperature",
-    "Night sky with spiral concentric stars, also change the theme's color temperature",
-    "Background is aurora by a frozen lake, change theme's color temperature and lighting to night",
-    "Change daytime to a sparkling night sky",
-    "Draw a rainbow in the sky",
-    "Add a meteor shower to the sky",
-    "Add some dramatic storm clouds",
-    "Change the season to a snowy winter",
-    "Add a flowing sea of clouds",
-    "Add a medieval castle in the distance",
-    "Add a magnificent waterfall in the background",
-    "Make glowing mushrooms grow on the ground",
-    "Add a sun starburst effect",
-    "Turn it into a fantasy landscape",
-    "Make the scene look like it's on an alien planet",
-    "Change the background to a beautiful beach",
-    "Blur the background into a green forest bokeh",
-    "Create a double exposure effect with a forest scene"
-];
-
-const zhPortraitPrompts = [
-    "讓圖1的角色, 依序擺成圖2的姿勢, 注意構圖與位置要與圖2保持一致",
-    "讓圖1與圖2的兩人擺出圖3的pose, 2人面對面漂浮空中, 不違背物理規律, 保持人物臉部完整",
-    "將圖1的人和圖2的人合成在同一畫面, 兩位人的動作、互動和空間關係參考圖3的姿勢, 背景是明亮的餐廳",
-    "把圖1人物的姿勢改成圖2的姿勢",
-    "讓畫面中的人複製出2份, 分別放在畫面其他角落, 每個人擺不同的姿勢、動作, 場景統一, 風格一致, 保持自然融入環境",
-    "將照片中的人變成未來感十足的機器人形象, 擁有金屬質感的機械身體、電子配件和科幻風格的特徵, 機械結構明顯, 細節豐富, 風格科技感強烈, 與原始服飾形成強烈對比, 保留頭部",
-    "讓照片中的女人穿上傳統古裝, 服飾風格為中國古代 仙俠造型, 配上精美頭飾和古風配件, 服裝色彩和質地與她原始現代服飾形成強烈對比",
-    "讓人穿上未來科技感的服裝",
-    "這個人除頭部外, 全身變成被火焰包圍的惡靈騎士",
-    "給主體戴上一副太陽眼鏡",
-    "為人物加上翅膀",
-    "在人物肩膀上加一隻小寵物",
-    "將她的臉瘦一點, 皮膚好一點, 手臂細一點 身材苗條一點, 在圖片中加入一層柔和的濾鏡",
-    "如果這個人突然發大財會怎樣",
-    "保留中間的人物主體, 刪除身邊的所有路人",
-    "根據圖中的主題與背景重新創作成專業電影海報風格(歐美風),主題的外型與風格清晰度要維持(與背景要自然融合),背景與光影可創作改變,最後根據創作好的圖,在圖上填入中文標題(字型要符合圖的氛圍,字不要太大,避免搶過主題),適當的位置填入根據創作圖的簡單故事說明(有詩人氣質語法,字不要太大),並且在左下方適當處加入簽名文字(伊凡 Ai photo)",
-    "背景換成在西藏的湖邊, 有雪山",
-    "高空視角, 這個人腳下走鋼絲, 背景是懸崖, 保持主體的姿勢不變"
-];
-
-const enPortraitPrompts = [
-    "Arrange the character from image 1 into the pose from image 2, ensuring composition and position match image 2.",
-    "Have the two people from image 1 and image 2 strike the pose from image 3, floating face-to-face in mid-air, obeying physical laws, keeping their faces complete.",
-    "Combine the person from image 1 and the person from image 2 into the same frame. The posture, interaction, and spatial relationship of the two people should reference the pose in image 3. The background is a bright restaurant.",
-    "Change the pose of the person in image 1 to the pose in image 2.",
-    "Duplicate the person in the image twice, place them in other corners of the frame, each with a different pose and action. The scene and style should be consistent, maintaining a natural integration into the environment.",
-    "Transform the person in the photo into a futuristic robot, with a metallic mechanical body, electronic components, and sci-fi features. The mechanical structure should be clear and detailed, with a strong technological feel, contrasting sharply with the original clothing, but keeping the head.",
-    "Have the woman in the photo wear traditional ancient clothing, in a Chinese ancient martial arts fantasy style, with exquisite headdresses and ancient accessories. The color and texture of the clothing should contrast sharply with her original modern attire.",
-    "Have the person wear futuristic, tech-inspired clothing.",
-    "Except for the head, turn this person's entire body into a Ghost Rider surrounded by flames.",
-    "Put a pair of sunglasses on the subject.",
-    "Add wings to the person.",
-    "Add a small pet on the person's shoulder.",
-    "Make her face a bit thinner, skin a bit better, arms a bit slender, and body a bit slimmer. Add a soft filter to the image.",
-    "What if this person suddenly became very wealthy?",
-    "Keep the main person in the middle, remove all bystanders.",
-    "Recreate as a professional movie poster in Western style. Maintain subject clarity/shape (blend naturally). Creative changes to background/lighting allowed. Add a Chinese title (font fitting atmosphere, not too big), a brief poetic story description (font fitting atmosphere, not too big), and sign 'Ivan Ai photo' at the bottom left.",
-    "Change the background to a lakeside in Tibet with snow-capped mountains.",
-    "High-angle view, this person is walking a tightrope with a cliff in the background, keeping the subject's posture unchanged."
-];
-
-
-const zhComprehensivePrompts = [
-    "完全去除雜訊 讓背景畫面超級平滑乾凈 主題清析銳利 細節清楚  主題外型姿勢不變",
-    "自動修圖,調整曝光度.對比 .飽和. 增強主題細節 ,減少過曝   主題明亮清晰 主題外型姿勢不變  背景無雜訊  大光圈鏡頭拍攝 模糊散景",
-    "去除不必要的雜枝,讓主題看起來更清楚,整個畫面乾淨 主題外型姿勢不變",
-    "自動修圖,下午時候拍攝自然光影,增強細節,主題外型姿勢不變",
-    "畫面變亮, 變清晰 ,變乾淨 ,主題外型姿勢不變",
-    "荷蘭 Lars van de Goor 攝影風格",
-    "背景換成平移追焦攝影,違反自然科學規律的影像,大光圈優選快門產生的超級動態模糊殘影藝術效果,動態模糊由2種角度組合,主題背景是水平模糊,主題是垂直或斜度的動態模糊,超級動態模糊內容隨機創作,包含:公園.夜景.森林.花園.餐廳....等可配合主題光影景深色,地景的光影顏色要自然融合,主題的姿勢外型不變",
-    "超大光圈攝影,拍攝出的影像,主題外圍自然漸層出的散景,像台灣地圖外型延伸到四周圍,變成像濾鏡穿透濾鏡革所拍攝出的綠色夢幻模糊散景,影像的主題保持清晰主題外型姿勢不變",
-    "超大光圈攝影 穿透過櫻花 主題保持清晰 四周圍繞粉色夢幻模糊散景 主題外型姿勢不變",
-    "超寫實風格，8K高清畫質，一隻手掌托舉著精緻微縮3D玩偶 造型細節：圖中主題的形象。 動態姿態：圖中主題貼近手掌的自然姿勢。 背景氛圍：背景虛化，營造出微縮場景的朦朧美感。",
-    "主題清楚,外型姿勢不變, 單眼相機後簾快門拍攝效果,產生主題移動後的運動模糊殘影,在主題身後,殘影很淡,隱約可看出",
-    "套用霓虹、賽博龐克風格",
-    "模擬這張圖的彩繪創作,完成3/4的狀況,有些有上色,有些上一部分色,有些是素描草稿",
-    "中國水墨畫風格 ,多處留白 ,有印章落款 ,主題外型不變",
-    "產生薄薄雲霧飄渺,有斜射光影,像仙境的氛圍,主題維持清晰",
-    "讓主題周圍變暗,自然光影降在主題,左上方照到右下方,形成亮與暗的強烈對比,電影主角氛圍,自動修圖,增強電影,超級細節,色彩繽紛,朦朧照明,用單眼相機拍攝,主題外型姿勢不變",
-    "主題清楚,外型姿勢不變, 單眼相機後簾快門拍攝效果,產生主題移動後的運動模糊殘影,在主題身後,殘影很淡,隱約可看出",
-    "繪圖1加上類似圖2這種手繪風格的塗鴉以及文字。Morning. Nice Day. Happy。"
-];
-
-const enComprehensivePrompts = [
-    "Completely remove noise, making the background super smooth and clean. Keep the subject clear and sharp, with distinct details, subject's shape and pose unchanged.",
-    "Auto retouch: adjust exposure, contrast, saturation, enhance subject details, reduce overexposure. Make the subject bright and clear, pose unchanged. Background is noise-free, large aperture lens, blurry bokeh.",
-    "Remove unnecessary branches, making the subject look clearer. Clean up the whole picture. Subject's shape and pose unchanged.",
-    "Auto retouch for afternoon natural light. Enhance details. Subject's shape and pose unchanged.",
-    "Make the picture brighter, clearer, and cleaner. Subject's shape and pose unchanged.",
-    "In the style of Dutch photographer Lars van de Goor.",
-    "Change background to a panning shot defying physics. Super motion blur & artistic ghosting from a large aperture. Background is horizontally blurred, subject has vertical/diagonal blur. Scene (park, night, forest, etc.) matches subject's lighting. Subject's pose/shape unchanged.",
-    "Super large aperture photography. Natural gradient bokeh around the subject, extending outwards, creating a dreamy green blur as if shot through a colored filter. Subject remains clear, shape and pose unchanged.",
-    "Super large aperture photography, shooting through cherry blossoms. Subject remains clear, surrounded by a dreamy pink blur. Subject's shape and pose unchanged.",
-    "Hyper-realistic style, 8K HD, a hand holding an exquisite miniature 3D doll. Details: The subject from the image. Pose: Natural posture close to the palm. Background: Blurred to create the hazy beauty of a miniature scene.",
-    "Subject clear, pose unchanged. DSLR camera rear-curtain sync shutter effect, creating a faint motion blur trail behind the subject.",
-    "Apply a neon, cyberpunk style",
-    "Simulate a colored drawing of this image, 3/4 complete. Some parts colored, some with a base color, some are sketch drafts.",
-    "Chinese ink painting style, with plenty of white space and a seal inscription. Subject's shape unchanged.",
-    "Create a thin, ethereal mist with diagonal light rays, like a fairytale atmosphere, keeping the subject clear.",
-    "Darken surroundings, light on subject from top-left to bottom-right, creating strong contrast. Cinematic atmosphere, auto retouch, super details, vibrant colors, hazy lighting. DSLR camera look, subject's pose/shape unchanged.",
-    "Subject clear, pose unchanged. DSLR camera rear-curtain sync shutter effect, creating a faint motion blur trail behind the subject.",
-    "Add hand-drawn style graffiti like in image 2, and the text 'Morning. Nice Day. Happy.' to image 1."
-];
 
 export const translations = {
   en: {
@@ -197,7 +60,7 @@ export const translations = {
     downloadButton: "Download",
     editResultButton: "Edit This",
     instructionalPrompt: "The red lines are a mask. Edit only that area. If no mask, edit globally.",
-    rateLimitError: "Too many requests. Please wait 1 minute.", // Updated
+    rateLimitError: "API limit exceeded. Try again later.",
     zoomInButton: "Zoom In",
     zoomOutButton: "Zoom Out",
     resetViewButton: "Reset View",
@@ -388,7 +251,7 @@ export const translations = {
     downloadButton: "下載",
     editResultButton: "編輯此圖",
     instructionalPrompt: "重要：紅線是遮罩，請只編輯遮罩區域。若無紅線則編輯全圖。",
-    rateLimitError: "請求過於頻繁，請稍等一分鐘再試 (API 速率限制)。", // Updated
+    rateLimitError: "API 使用量已達上限。",
     zoomInButton: "放大",
     zoomOutButton: "縮小",
     resetViewButton: "重置",
