@@ -1,6 +1,5 @@
 
-
-// ... (keeping existing prompts arrays - zhBirdsPrompts, enBirdsPrompts, etc. UNCHANGED to save space in this response, assume they exist) ...
+// ... (keep existing prompts arrays - zhBirdsPrompts, enBirdsPrompts etc. - assume they are here) ...
 const zhBirdsPrompts = [
     "圖1的鳥站在圖2的樹藤上 樹藤底下裸空",
     "圖1與圖2的鳥,是一對恩愛情侶,頭上羽毛澎起,站在圖3的樹藤上",
@@ -172,7 +171,6 @@ const enComprehensivePrompts = [
 
 export const translations = {
   en: {
-    // ... (previous keys)
     title: "Ivan Ai Photo",
     subtitle: "Draw on your image and transform it with AI.",
     uploadTitle: "Upload an Image",
@@ -302,7 +300,7 @@ export const translations = {
     adminPanelTitle: "Admin",
     refiningButton: "Refining...",
     enhancePromptButton: "Refine Prompt (1 Credit)",
-    aspectRatioLabel: "Aspect Ratio",
+    aspectRatioLabel: "Aspect Ratio (Text-to-Image Only)",
     ratio11: "1:1",
     ratio43: "4:3",
     ratio169: "16:9",
@@ -493,7 +491,7 @@ export const translations = {
     adminPanelTitle: "管理員",
     refiningButton: "優化中...",
     enhancePromptButton: "優化提示詞 (1 點)",
-    aspectRatioLabel: "長寬比",
+    aspectRatioLabel: "長寬比 (僅限文生圖用)",
     ratio11: "1:1",
     ratio43: "4:3",
     ratio169: "16:9",

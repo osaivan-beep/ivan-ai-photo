@@ -21,17 +21,26 @@ export const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
     const [image, setImage] = useState<HTMLImageElement | null>(null);
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
     const lastPoint = useRef<{ x: number, y: number } | null>(null);
+    const imageLoadedRef = useRef(false);
 
     useEffect(() => {
+      if (!imageSrc) return;
+      
       const img = new Image();
       img.crossOrigin = "anonymous";
-      img.src = imageSrc;
+      
+      // Reset state for new image
+      imageLoadedRef.current = false;
+      setImage(null);
+
       img.onload = () => {
+        imageLoadedRef.current = true;
         setImage(img);
         setDimensions({ width: img.naturalWidth, height: img.naturalHeight });
         
         const mainCanvas = mainCanvasRef.current;
         const previewCanvas = previewCanvasRef.current;
+        
         if (mainCanvas && previewCanvas) {
           mainCanvas.width = img.naturalWidth;
           mainCanvas.height = img.naturalHeight;
@@ -45,11 +54,12 @@ export const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
           }
         }
       };
+      img.src = imageSrc;
     }, [imageSrc]);
     
     const resetCanvas = useCallback(() => {
         const canvas = mainCanvasRef.current;
-        if (canvas && image) {
+        if (canvas && image && imageLoadedRef.current) {
             const ctx = canvas.getContext('2d');
             if (ctx) {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -82,16 +92,10 @@ export const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
             clientY = event.clientY;
         }
         
-        // Since we are now sizing the container to the image, offset is 0 and render size matches container size
         const renderedWidth = rect.width;
-        // const renderedHeight = rect.height; 
-        const offsetX = 0;
-        const offsetY = 0;
-        
         const relativeX = clientX - rect.left;
         const relativeY = clientY - rect.top;
 
-        // Check if cursor is outside the rendered image area
         if (
           clamp &&
           (relativeX < 0 ||
@@ -102,8 +106,6 @@ export const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
           return null;
         }
         
-        // The scale handles the zoom level implicitly because rect.width includes the CSS transform scale from parent
-        // naturalWidth / rect.width converts screen pixels back to canvas pixels
         const scale = image.naturalWidth / renderedWidth;
 
         return {
@@ -114,7 +116,7 @@ export const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
 
     const startDrawing = (event: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
       if (!enableDrawing) return;
-      event.stopPropagation(); // Prevent panning when trying to draw
+      event.stopPropagation();
       const coords = getCoordinates(event);
       if (!coords) return;
       setIsDrawing(true);
@@ -157,21 +159,18 @@ export const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
       const ctx = previewCanvas.getContext('2d');
       if (!ctx) return;
 
-      // Always clear the preview canvas
       ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
 
       if (!enableDrawing) return;
       
-      // Get coordinates without clamping to the image bounds for preview
       const coords = getCoordinates(event, false);
       if (!coords) return;
       
       const { x, y } = coords;
       
-      // Draw the new preview circle
       ctx.beginPath();
       ctx.arc(x, y, brushSize / 2, 0, 2 * Math.PI, false);
-      const colorWithAlpha = brushColor + '80'; // Add 50% alpha
+      const colorWithAlpha = brushColor + '80'; 
       ctx.fillStyle = colorWithAlpha;
       ctx.fill();
       ctx.strokeStyle = brushColor;
@@ -194,7 +193,6 @@ export const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
     };
 
     const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-        // No preview on touch for simplicity, just draw
         draw(e);
     };
 
@@ -218,11 +216,11 @@ export const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
         >
             <canvas
                 ref={mainCanvasRef}
-                className="absolute top-0 left-0 w-full h-full"
+                className="absolute top-0 left-0 w-full h-full block" 
             />
             <canvas
                 ref={previewCanvasRef}
-                className="absolute top-0 left-0 w-full h-full pointer-events-none"
+                className="absolute top-0 left-0 w-full h-full pointer-events-none block"
             />
         </div>
     );
