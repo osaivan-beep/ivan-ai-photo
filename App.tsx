@@ -145,7 +145,6 @@ const LandingScreen: React.FC<{ onConfigSave: (config: FirebaseConfig) => void; 
             }
 
             if (objectString) {
-                // eslint-disable-next-line no-new-func
                 const configObj = new Function(`return ${objectString}`)();
                 
                 if (!configObj.apiKey) {
@@ -234,6 +233,7 @@ const LandingScreen: React.FC<{ onConfigSave: (config: FirebaseConfig) => void; 
         setLoading(true);
         setError(null);
         try {
+            // Strict Login Only
             await login(email.trim(), password);
             onAuthSuccess();
         } catch (err: any) {
@@ -248,10 +248,8 @@ const LandingScreen: React.FC<{ onConfigSave: (config: FirebaseConfig) => void; 
                 setError('此 Email 已被註冊。');
             } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
                 setError('帳號或密碼錯誤。');
-            } else if (err.code === 'auth/weak-password') {
-                setError('密碼強度不足 (需 6 位以上)。');
             } else if (err.code === 'auth/user-not-found') {
-                setError('找不到此帳號。請聯絡管理員開通。');
+                setError('找不到此帳號。請聯絡管理員開通權限。');
             } else {
                 setError(errorMessage);
             }
@@ -400,21 +398,6 @@ const PermissionErrorModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
             <p className="text-gray-300 mb-4 text-sm">
                 The app cannot read/write to the database. This usually means the Firestore Rules are not set correctly.
             </p>
-            <ol className="list-decimal list-inside text-gray-400 text-sm mb-4 space-y-2">
-                <li>Go to <a href="https://console.firebase.google.com/" target="_blank" className="text-blue-400 hover:underline">Firebase Console</a> &gt; Firestore Database.</li>
-                <li>Click the <strong>Rules</strong> tab.</li>
-                <li>Replace the code with this:</li>
-            </ol>
-            <div className="bg-black p-3 rounded-md font-mono text-xs text-green-400 overflow-x-auto mb-4 border border-gray-700">
-                rules_version = '2';<br/>
-                service cloud.firestore {'{'}<br/>
-                &nbsp;&nbsp;match /databases/{'{'}database{'}'}/documents {'{'}<br/>
-                &nbsp;&nbsp;&nbsp;&nbsp;match /users/{'{'}userId{'}'} {'{'}<br/>
-                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;allow read, write: if request.auth != null;<br/>
-                &nbsp;&nbsp;&nbsp;&nbsp;{'}'}<br/>
-                &nbsp;&nbsp;{'}'}<br/>
-                {'}'}
-            </div>
             <button onClick={onClose} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg">
                 I Fixed It, Try Again
             </button>
@@ -432,7 +415,6 @@ const getClosestAspectRatio = (width: number, height: number): '1:1' | '16:9' | 
         { r: 4/3, val: '4:3' as const },
         { r: 3/4, val: '3:4' as const }
     ];
-    // Find closest
     return targets.reduce((prev, curr) => 
         Math.abs(curr.r - ratio) < Math.abs(prev.r - ratio) ? curr : prev
     ).val;
@@ -469,7 +451,6 @@ const App: React.FC = () => {
   const [isLayoutEditorOpen, setIsLayoutEditorOpen] = useState(false);
   const [editingImage, setEditingImage] = useState<UploadedImage | null>(null);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
-  const [adminMsg, setAdminMsg] = useState('');
   const [showPermissionHelp, setShowPermissionHelp] = useState(false);
 
   const canvasRef = useRef<CanvasEditorRef>(null);
@@ -493,6 +474,7 @@ const App: React.FC = () => {
     setTimeout(() => {
         const container = imageContainerRef.current;
         if (!container) return;
+        
         const img = new Image();
         img.src = selectedImage.dataUrl;
         img.onload = () => {
@@ -500,17 +482,35 @@ const App: React.FC = () => {
              const w = container.clientWidth;
              const h = container.clientHeight;
              if (w === 0 || h === 0) return;
+             
              const scaleX = (w - padding) / img.naturalWidth;
              const scaleY = (h - padding) / img.naturalHeight;
-             setZoom(Math.min(scaleX, scaleY)); 
+             const scale = Math.min(scaleX, scaleY);
+             
+             setZoom(scale); 
              setPan({ x: 0, y: 0 });
         };
     }, 50);
   }, [selectedImage]);
 
-  useEffect(() => { if (selectedImageId) fitImageToScreen(); }, [selectedImageId, fitImageToScreen]);
-  useEffect(() => { const handleResize = () => fitImageToScreen(); window.addEventListener('resize', handleResize); return () => window.removeEventListener('resize', handleResize); }, [fitImageToScreen]);
-  useEffect(() => { if (selectedImageId && !loading && !apiResult.imageUrl) fitImageToScreen(); }, [selectedImageId, loading, apiResult.imageUrl, fitImageToScreen]);
+  useEffect(() => {
+      if (selectedImageId) {
+          fitImageToScreen();
+      }
+  }, [selectedImageId, fitImageToScreen]);
+  
+  useEffect(() => {
+      const handleResize = () => fitImageToScreen();
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+  }, [fitImageToScreen]);
+
+  useEffect(() => {
+      if (selectedImageId && !loading && !apiResult.imageUrl) {
+          fitImageToScreen();
+      }
+  }, [selectedImageId, loading, apiResult.imageUrl, fitImageToScreen]);
+
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -524,15 +524,26 @@ const App: React.FC = () => {
                 window.location.reload();
                 return;
             }
-        } catch (e) {}
+        } catch (e) {
+            console.error('Invalid setup string');
+        }
     }
-    if (isFirebaseConfigured()) { try { initializeFirebase(); setFirebaseInitialized(true); } catch (e) { console.error(e); } }
+
+    if (isFirebaseConfigured()) {
+        try {
+            initializeFirebase();
+            setFirebaseInitialized(true);
+        } catch (e) {
+            console.error("Failed to initialize firebase", e);
+        }
+    }
   }, []);
 
   useEffect(() => {
     if (!firebaseInitialized) return;
     const auth = getAuthInstance();
     if (!auth) return;
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
         if (user) {
             try {
@@ -540,7 +551,10 @@ const App: React.FC = () => {
                 setUserProfile(profile);
                 setAppState('app');
             } catch (e: any) {
-                if (e.code === 'permission-denied') setShowPermissionHelp(true);
+                console.error("Failed to get profile:", e);
+                if (e.code === 'permission-denied' || e.message?.includes('Missing or insufficient permissions')) {
+                     setShowPermissionHelp(true);
+                }
             }
         } else {
             setUserProfile(null);
@@ -550,30 +564,67 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, [appState, firebaseInitialized]);
 
-  // Check for custom key on mount
   useEffect(() => {
       const key = localStorage.getItem('custom_gemini_api_key');
       if (key) setIsCustomKey(true);
-      else setShowKeyModal(true); // Force show modal if no key
+      else setShowKeyModal(true);
   }, []);
 
-  useEffect(() => { setHasKey(true); }, []);
+  useEffect(() => {
+      const checkKey = async () => {
+          if (process.env.API_KEY && process.env.API_KEY.length > 0) {
+              setHasKey(true);
+              return;
+          }
+          setHasKey(true);
+      };
+      checkKey();
+  }, []);
 
-  const handleConfigSave = (config: FirebaseConfig) => { try { initializeFirebase(config); setFirebaseInitialized(true); } catch (e: any) { alert(e.message); } };
-  const refreshUserProfile = async () => { if (userProfile) { try { const updated = await getUserProfile(userProfile.uid); setUserProfile(updated); } catch(e) {} } };
+  const handleConnectApiKey = async () => {
+      if (window.aistudio && window.aistudio.openSelectKey) {
+          await window.aistudio.openSelectKey();
+          setHasKey(true); 
+      }
+  };
+  
+  const handleConfigSave = (config: FirebaseConfig) => {
+      try {
+          initializeFirebase(config);
+          setFirebaseInitialized(true);
+      } catch (e: any) {
+          alert(e.message);
+      }
+  };
+  
+  const refreshUserProfile = async () => {
+      if (userProfile) {
+          try {
+              const updated = await getUserProfile(userProfile.uid);
+              setUserProfile(updated);
+          } catch(e) { console.error("Refresh failed", e); }
+      }
+  };
 
   const handleRefinePrompt = async () => {
     if (!prompt) return;
-    if (!userProfile || userProfile.credits < 1) { alert(t('notEnoughCredits')); return; }
+    if (!userProfile || userProfile.credits < 1) {
+        alert(t('notEnoughCredits'));
+        return;
+    }
 
     setIsRefining(true);
+    
     let imagePart: GeminiImagePart | null = null;
     if (selectedImage) {
         try {
             const dataUrl = canvasRef.current ? canvasRef.current.toDataURL() : selectedImage.dataUrl;
             const [header, base64Data] = dataUrl.split(',');
-            imagePart = { base64Data, mimeType: header.match(/:(.*?);/)?.[1] || 'image/png' };
-        } catch (e) {}
+            const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
+            imagePart = { base64Data, mimeType };
+        } catch (e) {
+            console.error("Error preparing image for refine prompt:", e);
+        }
     }
 
     try {
@@ -584,8 +635,17 @@ const App: React.FC = () => {
             setPrompt(enhancedPrompt);
         }
     } catch (e: any) {
-         if (e.code === 'permission-denied') setShowPermissionHelp(true);
-    } finally { setIsRefining(false); }
+        console.error("Refine prompt failed", e);
+        if (e.code === 'permission-denied' || e.message?.includes('Missing or insufficient permissions')) {
+            setShowPermissionHelp(true);
+        }
+    } finally {
+        setIsRefining(false);
+    }
+  };
+
+  const getCostForResolution = (res: ImageResolution) => {
+      return 3;
   };
 
   const handleDeductCredits = async (amount: number) => {
@@ -593,7 +653,9 @@ const App: React.FC = () => {
           try {
             await deductCredits(userProfile.uid, amount);
             setUserProfile(prev => prev ? { ...prev, credits: prev.credits - amount } : null);
-          } catch(e) {}
+          } catch(e) {
+              console.error("Failed to deduct credits in child component", e);
+          }
       }
   }
 
@@ -608,19 +670,24 @@ const App: React.FC = () => {
       setShowKeyModal(true);
   };
 
-  const handleConnectApiKey = () => {
-    setHasKey(true);
-  };
-
   const handleGenerate = useCallback(async () => {
     const cost = 3;
-    if (!prompt) { setError('Please enter a prompt.'); return; }
-    if (!userProfile || userProfile.credits < cost) { setError(t('notEnoughCredits')); return; }
+    if (!prompt) {
+      setError('Please enter a prompt.');
+      return;
+    }
+    if (!userProfile || userProfile.credits < cost) {
+        setError(t('notEnoughCredits'));
+        return;
+    }
 
     let capturedCanvasData: string | null = null;
     if (selectedImage && !apiResult.imageUrl) {
-        if (canvasRef.current) { capturedCanvasData = canvasRef.current.toDataURL('image/png'); } 
-        else { capturedCanvasData = selectedImage.dataUrl; }
+        if (canvasRef.current) {
+             capturedCanvasData = canvasRef.current.toDataURL('image/png');
+        } else {
+             capturedCanvasData = selectedImage.dataUrl;
+        }
     }
 
     const previousResultUrl = apiResult.imageUrl;
@@ -639,10 +706,12 @@ const App: React.FC = () => {
       }
 
       let resultImageUrl = '';
+      let resultText = '';
 
       if (!selectedImage) {
         const result = await generateImageWithGemini(prompt, effectiveAspectRatio);
         resultImageUrl = result.imageUrl;
+        
         if (resultImageUrl) {
             await deductCredits(userProfile.uid, cost);
             setUserProfile(prev => prev ? { ...prev, credits: prev.credits - cost } : null);
@@ -652,7 +721,8 @@ const App: React.FC = () => {
         let baseImagePart: GeminiImagePart;
         if (previousResultUrl) {
             const [header, base64Data] = previousResultUrl.split(',');
-            baseImagePart = { base64Data, mimeType: header.match(/:(.*?);/)?.[1] || 'image/png' };
+            const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
+            baseImagePart = { base64Data, mimeType };
         } else {
             if (!capturedCanvasData) throw new Error('Canvas data missing.');
             const base64Data = capturedCanvasData.split(',')[1];
@@ -661,40 +731,79 @@ const App: React.FC = () => {
         
         const imagesToSend: GeminiImagePart[] = [baseImagePart];
         
+        const imageReferenceKeyword = t('imageReference');
+        const regex = new RegExp(`${imageReferenceKeyword}(\\d+)`, 'g');
+        let match;
+        while ((match = regex.exec(prompt)) !== null) {
+          const imageNumber = parseInt(match[1], 10);
+          if (imageNumber > 0 && imageNumber <= uploadedImages.length) {
+          }
+        }
+        
         const editPrefix = "Edit instruction: ";
         const finalPrompt = `${editPrefix}${prompt}\n\n${t('instructionalPrompt')}`;
         
-        const result = await editImageWithGemini(imagesToSend, finalPrompt);
+        const result = await editImageWithGemini(
+          imagesToSend,
+          finalPrompt
+        );
+        
         const response = result.response;
 
-        if (response.candidates && response.candidates[0]?.content?.parts) {
-          const part = response.candidates[0].content.parts.find(p => p.inlineData);
-          if (part?.inlineData) {
-            resultImageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+        if (response.candidates && response.candidates[0] && response.candidates[0].content && response.candidates[0].content.parts) {
+          for (const part of response.candidates[0].content.parts) {
+            if (part.text) {
+              resultText += part.text + '\n';
+            } else if (part.inlineData) {
+              resultImageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+            }
           }
         } else {
           throw new Error('Invalid response structure from API.');
         }
 
-        if (resultImageUrl) {
-             await deductCredits(userProfile.uid, cost);
-             setUserProfile(prev => prev ? { ...prev, credits: prev.credits - cost } : null);
-             setApiResult({ text: null, imageUrl: resultImageUrl });
+        if (resultImageUrl || resultText) {
+             let contentChanged = true;
+
+             if (selectedImage && resultImageUrl) {
+                  const sourceDataUrl = previousResultUrl || capturedCanvasData || selectedImage.dataUrl;
+                  if (sourceDataUrl === resultImageUrl) {
+                      contentChanged = false;
+                  }
+             }
+
+             if (contentChanged) {
+                 const finalCost = cost;
+                 await deductCredits(userProfile.uid, finalCost);
+                 setUserProfile(prev => prev ? { ...prev, credits: prev.credits - finalCost } : null);
+             }
+             setApiResult({ text: resultText.trim(), imageUrl: resultImageUrl });
         }
       }
     } catch (e: any) {
       console.error(e);
-      const msg = e.message || '';
-      if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) setError('API Permission Denied. Please check your custom API key.');
-      else if (msg.includes('RESOURCE_EXHAUSTED')) setError(t('rateLimitError'));
-      else setError(msg);
+      if (e.code === 'permission-denied' || e.message?.includes('Missing or insufficient permissions')) {
+          setShowPermissionHelp(true);
+          setLoading(false);
+          setApiResult({ text: null, imageUrl: previousResultUrl });
+          return;
+      }
+
+      const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred.';
+      if (errorMessage === 'RATE_LIMIT_EXCEEDED') {
+        setError(t('rateLimitError'));
+      } else if (errorMessage === 'PERMISSION_DENIED' || errorMessage.includes('403') || errorMessage.includes('PERMISSION_DENIED')) {
+        setError('PERMISSION_DENIED_UI');
+      } else {
+        setError(errorMessage);
+      }
       setApiResult({ text: null, imageUrl: previousResultUrl });
     } finally {
       setLoading(false);
     }
   }, [selectedImage, prompt, uploadedImages, selectedImageId, t, apiResult.imageUrl, aspectRatio, userProfile]);
 
-  // Image & Canvas Handlers (Same as before)
+  // Image & Canvas Handlers
   const handleFiles = useCallback((files: FileList) => {
     const filesArray = Array.from(files).filter(file => file.type.startsWith('image/'));
     if (filesArray.length === 0) return;
@@ -729,9 +838,7 @@ const App: React.FC = () => {
   const handleImageReorder = (reorderedImages: UploadedImage[]) => setUploadedImages(reorderedImages);
   const handleClearResult = () => { setApiResult({ text: null, imageUrl: null }); setError(null); setWarning(null); };
   
-  // Reuse existing helpers
   const handlePanByControl = useCallback((dx: number, dy: number) => { setPan(p => ({ x: p.x + dx, y: p.y + dy })); }, []);
-  // Removed wheel zooming on canvas to prevent view layout issues, per user request. Zooming is now handled via the controls only.
   const handlePanStart = useCallback((clientX: number, clientY: number) => {
     if (!imageContainerRef.current) return;
     panStartRef.current = { startX: clientX, startY: clientY, startPan: pan };
@@ -745,6 +852,7 @@ const App: React.FC = () => {
   const resetView = useCallback(() => { fitImageToScreen(); }, [fitImageToScreen]);
   const onMouseDown = (e: React.MouseEvent) => { if (e.button !== 0) return; e.preventDefault(); handlePanStart(e.clientX, e.clientY); };
   const onMouseMove = (e: React.MouseEvent) => { e.preventDefault(); handlePanMove(e.clientX, e.clientY); };
+  
   const onTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       setIsPanning(false);
@@ -771,7 +879,7 @@ const App: React.FC = () => {
     } else if (e.touches.length === 1 && isPanning) { handlePanMove(e.touches[0].clientX, e.touches[0].clientY); }
   };
   const onTouchEnd = (e: React.TouchEvent) => { handlePanEnd(); if (e.touches.length < 2) pinchStartRef.current = null; if (e.touches.length === 1) handlePanStart(e.touches[0].clientX, e.touches[0].clientY); };
-  
+
   const handleEditResult = () => {
     if (!apiResult.imageUrl) return;
     try {
@@ -831,8 +939,8 @@ const App: React.FC = () => {
                 <h1 className="text-4xl lg:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">
                     {t('title')} 
                     <span className="text-xs bg-gray-800 text-gray-400 px-2 py-1 rounded border border-gray-600 align-middle ml-2">
-                        Gemini 2.5 (v2025.11.30 Release)
-                        {isCustomKey ? <span className="text-green-400 ml-1">● Custom Key</span> : <span className="text-yellow-500 ml-1">● Default</span>}
+                        v2025.11.30 Release
+                        {isCustomKey ? <span className="text-green-400 ml-1">● Custom Key</span> : <span className="text-yellow-500 ml-1">● Default Key</span>}
                     </span>
                 </h1>
                 <p className="text-gray-400 mt-2">{t('subtitle')}</p>
@@ -862,7 +970,6 @@ const App: React.FC = () => {
             </div>
         </header>
 
-        {/* Admin Panel */}
         {userProfile?.isAdmin && (
             <div className="mb-6 bg-blue-900/20 border border-blue-500/30 p-4 rounded-lg">
                 <div className="flex justify-between items-center cursor-pointer" onClick={() => setIsAdminPanelOpen(!isAdminPanelOpen)}>
@@ -878,7 +985,6 @@ const App: React.FC = () => {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column */}
           <div className="flex flex-col gap-4 bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700">
              <div className="flex flex-wrap justify-between items-center gap-2">
               <div className="flex items-center gap-4">
@@ -914,7 +1020,6 @@ const App: React.FC = () => {
                     originalImageSrc={selectedImage?.dataUrl || null}
                  />
             ) : (
-                // Canvas View
                  <div className={`relative w-full aspect-[4/3] bg-gray-900 rounded-lg overflow-hidden border-2 border-dashed border-gray-700 group ${isPanMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}>
                     <div 
                         ref={imageContainerRef}
@@ -926,7 +1031,6 @@ const App: React.FC = () => {
                         onTouchStart={onTouchStart}
                         onTouchMove={onTouchMove}
                         onTouchEnd={onTouchEnd}
-                        // Removed onWheel to prevent zooming via mouse wheel
                     >
                     {!selectedImage ? (
                         <div className="flex flex-col items-center text-gray-500 cursor-pointer hover:text-gray-400 transition-colors" onClick={handleUploadClick}>
@@ -957,7 +1061,6 @@ const App: React.FC = () => {
                 </div>
             )}
 
-            {/* Toolbar for Canvas */}
             {!apiResult.imageUrl && (
                 <Toolbar
                     brushSize={brushSize}
@@ -969,7 +1072,6 @@ const App: React.FC = () => {
                 />
             )}
             
-            {/* Thumbnails */}
             <ThumbnailManager
                 images={uploadedImages}
                 selectedImageId={selectedImageId}
@@ -983,7 +1085,6 @@ const App: React.FC = () => {
             />
           </div>
 
-          {/* Right Column */}
           <div className="flex flex-col gap-6">
             <div className="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700 flex flex-col gap-4">
                  <div className="flex justify-between items-center">

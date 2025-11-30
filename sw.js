@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'ivan-ai-photo-cache-v31000';
+const CACHE_NAME = 'ivan-ai-photo-cache-v35000';
 const APP_SHELL_URLS = [
   '/',
   '/index.html',
@@ -25,7 +25,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting(); // Force activation immediately
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('Opened cache v31000');
+      console.log('Opened cache v35000');
       return cache.addAll(APP_SHELL_URLS);
     })
   );
