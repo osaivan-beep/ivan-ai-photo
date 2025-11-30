@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { GenerateContentResponse } from '@google/genai';
 import { CanvasEditor, type CanvasEditorRef } from './components/CanvasEditor';
@@ -5,14 +6,16 @@ import { QuickPrompts } from './components/QuickPrompts';
 import { Toolbar } from './components/Toolbar';
 import { ThumbnailManager } from './components/ThumbnailManager';
 import { ResultDisplay } from './components/ResultDisplay';
-import { UploadIcon, SparklesIcon, RedrawIcon, ZoomInIcon, ZoomOutIcon, ArrowsPointingOutIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, UserCircleIcon, ShareIcon, CloseIcon } from './components/Icons';
+import { UploadIcon, SparklesIcon, RedrawIcon, ZoomInIcon, ZoomOutIcon, ArrowsPointingOutIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, UserCircleIcon, ShareIcon, CloseIcon, HandIcon } from './components/Icons';
 import { editImageWithGemini, generateImageWithGemini3, refinePrompt } from './services/geminiService';
 import type { ApiResult, Language, UploadedImage, GeminiImagePart, TFunction, ImageResolution, UserProfile, FirebaseConfig } from './types';
 import { translations } from './lib/translations';
 import { LayoutEditor } from './components/LayoutEditor';
 import { PhotoEditor } from './components/PhotoEditor';
-import { initializeFirebase, isFirebaseConfigured, login, register, logout, getUserProfile, deductCredits, addCreditsByEmail, getAuthInstance } from './services/firebaseService';
+import { initializeFirebase, isFirebaseConfigured, login, register, logout, getUserProfile, deductCredits, addCreditsByEmail, getAuthInstance, sendPasswordReset } from './services/firebaseService';
 import { onAuthStateChanged } from 'firebase/auth';
+import { AdminUserList } from './components/AdminUserList';
+import { embeddedConfig } from './lib/firebaseConfig';
 
 // This interface is not part of the standard DOM library yet.
 interface BeforeInstallPromptEvent extends Event {
@@ -24,101 +27,40 @@ interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
 }
 
-interface PanControlProps {
-  onPan: (dx: number, dy: number) => void;
-  panSpeed?: number;
-}
-
-const PanControl: React.FC<PanControlProps> = ({ onPan, panSpeed = 5 }) => {
-  const panDirectionRef = useRef({ x: 0, y: 0 });
-  const animationFrameRef = useRef<number | null>(null);
-
-  const panLoop = useCallback(() => {
-    if (panDirectionRef.current.x !== 0 || panDirectionRef.current.y !== 0) {
-      onPan(panDirectionRef.current.x * panSpeed, panDirectionRef.current.y * panSpeed);
-    }
-    animationFrameRef.current = requestAnimationFrame(panLoop);
-  }, [onPan, panSpeed]);
-
-  useEffect(() => {
-    animationFrameRef.current = requestAnimationFrame(panLoop);
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [panLoop]);
-
-  const handleInteractionStart = (x: number, y: number) => (e: React.MouseEvent | React.TouchEvent) => {
-    e.stopPropagation();
-    panDirectionRef.current = { x, y };
-  };
-
-  const handleInteractionEnd = () => (e: React.MouseEvent | React.TouchEvent) => {
-    e.stopPropagation();
-    panDirectionRef.current = { x: 0, y: 0 };
-  };
-
-  return (
-    <div 
-        className="absolute bottom-4 right-4 z-10 w-40 h-40 grid grid-cols-3 grid-rows-3 gap-2"
-        onMouseDown={e => e.stopPropagation()}
-        onMouseUp={e => e.stopPropagation()}
-        onTouchStart={e => e.stopPropagation()}
-        onTouchEnd={e => e.stopPropagation()}
-    >
-      <div />
-      <button
-        onMouseDown={handleInteractionStart(0, -1)}
-        onMouseUp={handleInteractionEnd()}
-        onMouseLeave={handleInteractionEnd()}
-        onTouchStart={handleInteractionStart(0, -1)}
-        onTouchEnd={handleInteractionEnd()}
-        className="bg-gray-800/80 rounded-full flex items-center justify-center text-white hover:bg-gray-700 active:bg-gray-600 transition-colors"
-        aria-label="Pan Up"
-      >
-        <ArrowUpIcon className="w-8 h-8" />
-      </button>
-      <div />
-      <button
-        onMouseDown={handleInteractionStart(-1, 0)}
-        onMouseUp={handleInteractionEnd()}
-        onMouseLeave={handleInteractionEnd()}
-        onTouchStart={handleInteractionStart(-1, 0)}
-        onTouchEnd={handleInteractionEnd()}
-        className="bg-gray-800/80 rounded-full flex items-center justify-center text-white hover:bg-gray-700 active:bg-gray-600 transition-colors"
-        aria-label="Pan Left"
-      >
-        <ArrowLeftIcon className="w-8 h-8" />
-      </button>
-      <div />
-      <button
-        onMouseDown={handleInteractionStart(1, 0)}
-        onMouseUp={handleInteractionEnd()}
-        onMouseLeave={handleInteractionEnd()}
-        onTouchStart={handleInteractionStart(1, 0)}
-        onTouchEnd={handleInteractionEnd()}
-        className="bg-gray-800/80 rounded-full flex items-center justify-center text-white hover:bg-gray-700 active:bg-gray-600 transition-colors"
-        aria-label="Pan Right"
-      >
-        <ArrowRightIcon className="w-8 h-8" />
-      </button>
-      <div />
-      <button
-        onMouseDown={handleInteractionStart(0, 1)}
-        onMouseUp={handleInteractionEnd()}
-        onMouseLeave={handleInteractionEnd()}
-        onTouchStart={handleInteractionStart(0, 1)}
-        onTouchEnd={handleInteractionEnd()}
-        className="bg-gray-800/80 rounded-full flex items-center justify-center text-white hover:bg-gray-700 active:bg-gray-600 transition-colors"
-        aria-label="Pan Down"
-      >
-        <ArrowDownIcon className="w-8 h-8" />
-      </button>
-      <div />
+// ZoomControls Component
+const ZoomControls = ({ zoom, onZoomChange, onFit, t, isPanMode, onTogglePan }: { zoom: number, onZoomChange: (z: number) => void, onFit: () => void, t: TFunction, isPanMode: boolean, onTogglePan: () => void }) => (
+    <div className="flex items-center gap-1 bg-gray-700/50 rounded-lg p-1 px-2 border border-gray-600 h-9">
+         <button 
+            onClick={onTogglePan} 
+            className={`p-1.5 rounded text-gray-300 ${isPanMode ? 'bg-purple-600 text-white' : 'hover:bg-gray-600'}`} 
+            title={t('panModeButton')}
+        >
+            <HandIcon className="w-4 h-4" />
+        </button>
+        <button onClick={() => onZoomChange(Math.max(0.01, zoom - 0.1))} className="p-1.5 hover:bg-gray-600 rounded text-gray-300" title={t('zoomOutButton')}>
+            <ZoomOutIcon className="w-4 h-4" />
+        </button>
+        <div className="relative group flex items-center">
+            <input 
+                type="number" 
+                value={Math.round(zoom * 100)} 
+                onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    if (!isNaN(val) && val > 0) onZoomChange(val / 100);
+                }}
+                className="w-10 bg-transparent text-center text-sm text-white focus:outline-none appearance-none font-mono"
+            />
+            <span className="text-xs text-gray-500 pointer-events-none">%</span>
+        </div>
+        <button onClick={() => onZoomChange(Math.min(10, zoom + 0.1))} className="p-1.5 hover:bg-gray-600 rounded text-gray-300" title={t('zoomInButton')}>
+            <ZoomInIcon className="w-4 h-4" />
+        </button>
+        <div className="w-px h-4 bg-gray-600 mx-1"></div>
+        <button onClick={onFit} className="p-1.5 hover:bg-gray-600 rounded text-gray-300" title={t('resetViewButton')}>
+            <ArrowsPointingOutIcon className="w-4 h-4" />
+        </button>
     </div>
-  );
-};
+);
 
 const LaunchScreen: React.FC<{ onConnect: () => void; t: TFunction }> = ({ onConnect, t }) => (
     <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4 text-center">
@@ -144,11 +86,37 @@ const LaunchScreen: React.FC<{ onConnect: () => void; t: TFunction }> = ({ onCon
     </div>
 );
 
-const SetupScreen: React.FC<{ onSave: (config: FirebaseConfig) => void; t: TFunction }> = ({ onSave, t }) => {
+const LandingScreen: React.FC<{ onConfigSave: (config: FirebaseConfig) => void; onAuthSuccess: () => void; t: TFunction }> = ({ onConfigSave, onAuthSuccess, t }) => {
+    // If embedded config exists, default to user tab and hide not ready warnings
+    const hasEmbedded = !!embeddedConfig;
+    const [activeTab, setActiveTab] = useState<'user' | 'admin'>('user');
     const [configStr, setConfigStr] = useState('');
     const [adminEmail, setAdminEmail] = useState('');
+    const [adminPassword, setAdminPassword] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [isRegistering, setIsRegistering] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [systemConfigured, setSystemConfigured] = useState(false);
+    const [showForgotPassword, setShowForgotPassword] = useState(false);
 
-    const handleSubmit = () => {
+    useEffect(() => {
+        setSystemConfigured(isFirebaseConfigured());
+    }, []);
+
+    const handleConfigSubmit = async () => {
+        const cleanAdminEmail = adminEmail.trim();
+        
+        if (cleanAdminEmail !== 'osa.ivan@gmail.com') {
+            alert(t('adminEmailValidation'));
+            return;
+        }
+        if (adminPassword.length < 6) {
+            alert("Password must be at least 6 characters.");
+            return;
+        }
+
         try {
             // 1. Basic cleaning: remove comments
             let clean = configStr.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1').trim();
@@ -174,13 +142,10 @@ const SetupScreen: React.FC<{ onSave: (config: FirebaseConfig) => void; t: TFunc
             // Attempt to extract the object content
             let objectString: string | null = null;
             
-            // Strategy 1: Find "firebaseConfig = { ... }" or "const config = { ... }"
-            // Adjusted regex to be more permissive with variable names
             let match = clean.match(/\w+\s*=\s*({[\s\S]*?})(;|)/);
             if (match) {
                 objectString = match[1];
             } else {
-                 // Strategy 2: Find just the object "{ ... }" containing likely keys
                  match = clean.match(/({[\s\S]*?apiKey[\s\S]*?})/);
                  if (match) {
                      objectString = match[1];
@@ -188,8 +153,6 @@ const SetupScreen: React.FC<{ onSave: (config: FirebaseConfig) => void; t: TFunc
             }
 
             if (objectString) {
-                // Safe evaluation of the object string using Function constructor
-                // This handles valid JS object syntax that JSON.parse might fail on (like unquoted keys or trailing commas)
                 // eslint-disable-next-line no-new-func
                 const configObj = new Function(`return ${objectString}`)();
                 
@@ -198,19 +161,63 @@ const SetupScreen: React.FC<{ onSave: (config: FirebaseConfig) => void; t: TFunc
                      return;
                 }
                 
-                onSave({ ...configObj, adminEmail });
+                onConfigSave({ ...configObj, adminEmail: cleanAdminEmail });
+                setSystemConfigured(true);
+
+                // Auto Login/Register for Admin
+                setLoading(true);
+                try {
+                    // Try to register first
+                    try {
+                        await register(cleanAdminEmail, adminPassword);
+                    } catch (regError: any) {
+                        if (regError.code === 'auth/email-already-in-use') {
+                            // If user exists, try login
+                            await login(cleanAdminEmail, adminPassword);
+                        } else {
+                            throw regError;
+                        }
+                    }
+                    // If successful, onAuthStateChanged in App will handle the rest
+                } catch (authError: any) {
+                    console.error(authError);
+                    alert(`System initialized, but auto-login failed: ${authError.message}. Please try logging in manually.`);
+                    setActiveTab('user');
+                    setEmail(cleanAdminEmail);
+                } finally {
+                    setLoading(false);
+                }
             } else {
-                // Fallback: Try parsing as pure JSON
                 try {
                      const json = JSON.parse(clean);
                      if (json.apiKey) {
-                         onSave({ ...json, adminEmail });
+                         onConfigSave({ ...json, adminEmail: cleanAdminEmail });
+                         setSystemConfigured(true);
+                         
+                         // Auto Login/Register for Admin JSON path
+                         setLoading(true);
+                         try {
+                            try {
+                                await register(cleanAdminEmail, adminPassword);
+                            } catch (regError: any) {
+                                if (regError.code === 'auth/email-already-in-use') {
+                                    await login(cleanAdminEmail, adminPassword);
+                                } else {
+                                    throw regError;
+                                }
+                            }
+                         } catch (authError: any) {
+                             console.error(authError);
+                             alert(`System initialized, but auto-login failed: ${authError.message}. Please try logging in manually.`);
+                             setActiveTab('user');
+                             setEmail(cleanAdminEmail);
+                         } finally {
+                             setLoading(false);
+                         }
                          return;
                      }
                 } catch (e) {
-                    // Ignore JSON parse error
                 }
-                
                 throw new Error("Could not find a valid configuration object.");
             }
         } catch (e) {
@@ -221,59 +228,214 @@ const SetupScreen: React.FC<{ onSave: (config: FirebaseConfig) => void; t: TFunc
 
     const handleShare = () => {
         try {
-            // Create a basic config object from string if possible, or use raw text if it seems like a valid config string
-            // Simplest is to just encode what the user has typed, but validation is better.
-            // For now, let's just encode the input string if it contains basic markers
-            if (configStr.includes('apiKey') && configStr.includes('authDomain')) {
-                 const encoded = btoa(configStr);
+            const stored = localStorage.getItem('firebaseConfig');
+            if (stored) {
+                 const encoded = btoa(stored);
                  const url = `${window.location.origin}${window.location.pathname}?setup=${encoded}`;
                  navigator.clipboard.writeText(url);
-                 alert('Share link copied to clipboard! Send this to your friend to auto-configure the database.');
+                 alert(t('shareLinkCopied'));
             } else {
-                alert('Please paste a valid configuration first.');
+                alert('Configuration not found. Please initialize first.');
             }
         } catch (e) {
             alert('Failed to generate link.');
         }
     };
 
+    const handleAuthSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setError(null);
+        try {
+            if (showForgotPassword) {
+                if (!email) {
+                    setError('Please enter your email address.');
+                    setLoading(false);
+                    return;
+                }
+                await sendPasswordReset(email.trim());
+                alert(t('resetPasswordSent'));
+                setShowForgotPassword(false);
+            } else if (isRegistering) {
+                await register(email.trim(), password);
+                onAuthSuccess();
+            } else {
+                await login(email.trim(), password);
+                onAuthSuccess();
+            }
+        } catch (err: any) {
+            console.error(err);
+            if (err.code === 'auth/operation-not-allowed') {
+                setError('⚠️ 操作失敗：請至 Firebase Console > Authentication > Sign-in method 開啟「Email/Password」登入功能。');
+            } else if (err.code === 'auth/email-already-in-use') {
+                setError('此 Email 已被註冊。');
+            } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+                setError('帳號或密碼錯誤。');
+            } else if (err.code === 'auth/weak-password') {
+                setError('密碼強度不足 (需 6 位以上)。');
+            } else if (err.code === 'auth/user-not-found') {
+                setError('找不到此帳號。');
+            } else {
+                setError(err.message);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
-        <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-            <div className="bg-gray-800 p-8 rounded-2xl shadow-xl w-full max-w-lg border border-gray-700">
-                <h2 className="text-2xl font-bold text-white mb-4">{t('setupTitle')}</h2>
-                <p className="text-gray-400 mb-4 text-sm">{t('setupDescription')}</p>
-                <textarea
-                    className="w-full h-48 bg-gray-900 text-gray-200 p-3 rounded-lg border border-gray-600 mb-4 font-mono text-xs"
-                    placeholder={t('firebaseConfigPlaceholder')}
-                    value={configStr}
-                    onChange={(e) => setConfigStr(e.target.value)}
-                />
-                <input 
-                    type="email"
-                    className="w-full bg-gray-900 text-gray-200 p-3 rounded-lg border border-gray-600 mb-6"
-                    placeholder={t('adminEmailPlaceholder')}
-                    value={adminEmail}
-                    onChange={(e) => setAdminEmail(e.target.value)}
-                />
-                <div className="flex gap-2">
-                    <button
-                        onClick={handleSubmit}
-                        className="flex-grow py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition-colors"
-                    >
-                        {t('saveConfigButton')}
-                    </button>
-                    <button
-                         onClick={handleShare}
-                         className="px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
-                         title="Share Config Link"
-                    >
-                        <ShareIcon className="w-6 h-6" />
-                    </button>
+        <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
+             <div className="bg-gray-800 rounded-2xl shadow-xl w-full max-w-4xl border border-gray-700 overflow-hidden flex flex-col md:flex-row">
+                {/* Left Side: Branding / Info */}
+                <div className="bg-gradient-to-br from-purple-900 to-indigo-900 p-8 md:w-5/12 flex flex-col justify-center items-center text-center">
+                    <SparklesIcon className="w-20 h-20 text-purple-300 mb-6" />
+                    <h1 className="text-3xl font-bold text-white mb-2">{t('landingTitle' as any) || 'Ivan Ai Photo'}</h1>
+                    <p className="text-purple-200">{t('landingSubtitle' as any) || 'Professional AI Editor'}</p>
+                    {hasEmbedded && (
+                        <div className="mt-4 px-3 py-1 bg-green-900/50 border border-green-500/30 rounded-full text-xs text-green-300">
+                             {t('systemConfiguredEmbedded')}
+                        </div>
+                    )}
                 </div>
-            </div>
+
+                {/* Right Side: Forms */}
+                <div className="p-8 md:w-7/12 bg-gray-800">
+                    <div className="flex border-b border-gray-700 mb-6">
+                        <button 
+                            className={`flex-1 pb-3 text-sm font-medium transition-colors ${activeTab === 'user' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-500 hover:text-gray-300'}`}
+                            onClick={() => setActiveTab('user')}
+                        >
+                            {t('userLoginTab')}
+                        </button>
+                        {!hasEmbedded && (
+                            <button 
+                                className={`flex-1 pb-3 text-sm font-medium transition-colors ${activeTab === 'admin' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-500 hover:text-gray-300'}`}
+                                onClick={() => setActiveTab('admin')}
+                            >
+                                {t('adminSetupTab')}
+                            </button>
+                        )}
+                    </div>
+
+                    {activeTab === 'user' ? (
+                        <div>
+                             {!systemConfigured && !hasEmbedded ? (
+                                 <div className="text-center py-8">
+                                     <div className="bg-yellow-900/30 text-yellow-200 p-4 rounded-lg border border-yellow-700/50 mb-4">
+                                         {t('systemNotReady')}
+                                     </div>
+                                 </div>
+                             ) : (
+                                <form onSubmit={handleAuthSubmit} className="space-y-4 animate-fade-in">
+                                    <h2 className="text-xl font-bold text-white mb-4">
+                                        {showForgotPassword ? t('resetPasswordButton') : (isRegistering ? t('registerTitle') : t('loginTitle'))}
+                                    </h2>
+                                    {error && <div className="bg-red-900/50 text-red-200 p-3 rounded text-sm border border-red-700">{error}</div>}
+                                    <div>
+                                        <label className="block text-gray-400 text-sm mb-1">{t('emailLabel')}</label>
+                                        <input 
+                                            type="email" required
+                                            className="w-full bg-gray-900 text-white p-3 rounded border border-gray-600 focus:border-purple-500 focus:outline-none"
+                                            value={email} onChange={e => setEmail(e.target.value)}
+                                        />
+                                    </div>
+                                    {!showForgotPassword && (
+                                        <div>
+                                            <div className="flex justify-between">
+                                                <label className="block text-gray-400 text-sm mb-1">{t('passwordLabel')}</label>
+                                                {!isRegistering && (
+                                                    <button type="button" onClick={() => setShowForgotPassword(true)} className="text-xs text-purple-400 hover:text-purple-300">
+                                                        {t('forgotPasswordButton')}
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <input 
+                                                type="password" required
+                                                className="w-full bg-gray-900 text-white p-3 rounded border border-gray-600 focus:border-purple-500 focus:outline-none"
+                                                value={password} onChange={e => setPassword(e.target.value)}
+                                            />
+                                        </div>
+                                    )}
+                                    <button 
+                                        type="submit" 
+                                        disabled={loading}
+                                        className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50"
+                                    >
+                                        {loading ? '...' : (showForgotPassword ? t('resetPasswordButton') : (isRegistering ? t('registerButton') : t('loginButton')))}
+                                    </button>
+                                    
+                                    <div className="mt-4 text-center space-y-2">
+                                        {showForgotPassword ? (
+                                             <button 
+                                                type="button"
+                                                onClick={() => setShowForgotPassword(false)}
+                                                className="text-gray-400 text-sm hover:text-white"
+                                            >
+                                                {t('authSwitchToLogin')}
+                                            </button>
+                                        ) : (
+                                            <button 
+                                                type="button"
+                                                onClick={() => setIsRegistering(!isRegistering)}
+                                                className="text-purple-400 text-sm hover:underline"
+                                            >
+                                                {isRegistering ? t('authSwitchToLogin') : t('authSwitchToRegister')}
+                                            </button>
+                                        )}
+                                    </div>
+                                </form>
+                             )}
+                        </div>
+                    ) : (
+                        <div className="animate-fade-in">
+                             <h2 className="text-xl font-bold text-white mb-2">{t('setupTitle')}</h2>
+                             <p className="text-gray-400 text-sm mb-4">{t('shareLinkInstructions')}</p>
+                             
+                             <div className="space-y-4">
+                                <textarea
+                                    className="w-full h-32 bg-gray-900 text-gray-200 p-3 rounded-lg border border-gray-600 font-mono text-xs"
+                                    placeholder={t('firebaseConfigPlaceholder')}
+                                    value={configStr}
+                                    onChange={(e) => setConfigStr(e.target.value)}
+                                />
+                                <input 
+                                    type="email"
+                                    className="w-full bg-gray-900 text-gray-200 p-3 rounded-lg border border-gray-600"
+                                    placeholder={t('adminEmailPlaceholder')}
+                                    value={adminEmail}
+                                    onChange={(e) => setAdminEmail(e.target.value)}
+                                />
+                                <input 
+                                    type="password"
+                                    className="w-full bg-gray-900 text-gray-200 p-3 rounded-lg border border-gray-600"
+                                    placeholder={t('passwordLabel')}
+                                    value={adminPassword}
+                                    onChange={(e) => setAdminPassword(e.target.value)}
+                                />
+                                <button
+                                    onClick={handleConfigSubmit}
+                                    disabled={loading}
+                                    className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50"
+                                >
+                                    {loading ? 'Thinking...' : t('saveConfigButton')}
+                                </button>
+                                {systemConfigured && (
+                                     <button
+                                        onClick={handleShare}
+                                        className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2"
+                                     >
+                                         <ShareIcon className="w-5 h-5" />
+                                         {t('shareLinkButton')}
+                                     </button>
+                                )}
+                             </div>
+                        </div>
+                    )}
+                </div>
+             </div>
         </div>
-    );
-};
+    )
+}
 
 const PermissionErrorModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -307,88 +469,6 @@ const PermissionErrorModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
     </div>
 );
 
-const AuthScreen: React.FC<{ t: TFunction; onAuthSuccess: () => void }> = ({ t, onAuthSuccess }) => {
-    const [isRegistering, setIsRegistering] = useState(false);
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [showPermissionHelp, setShowPermissionHelp] = useState(false);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        setError(null);
-        try {
-            if (isRegistering) {
-                await register(email, password);
-            } else {
-                await login(email, password);
-            }
-            onAuthSuccess();
-        } catch (err: any) {
-            console.error(err);
-            if (err.code === 'auth/operation-not-allowed') {
-                setError('⚠️ 操作失敗：請至 Firebase Console > Authentication > Sign-in method 開啟「Email/Password」登入功能。');
-            } else if (err.code === 'auth/email-already-in-use') {
-                setError('此 Email 已被註冊。');
-            } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
-                setError('帳號或密碼錯誤。');
-            } else if (err.code === 'auth/weak-password') {
-                setError('密碼強度不足 (需 6 位以上)。');
-            } else if (err.code === 'permission-denied' || err.message?.includes('Missing or insufficient permissions')) {
-                 setShowPermissionHelp(true);
-            } else {
-                setError(err.message);
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-             {showPermissionHelp && <PermissionErrorModal onClose={() => setShowPermissionHelp(false)} />}
-             <div className="bg-gray-800 p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-700">
-                <h2 className="text-2xl font-bold text-white mb-6 text-center">{isRegistering ? t('registerTitle') : t('loginTitle')}</h2>
-                {error && <div className="bg-red-900/50 text-red-200 p-3 rounded mb-4 text-sm whitespace-pre-line border border-red-700">{error}</div>}
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-gray-400 text-sm mb-1">{t('emailLabel')}</label>
-                        <input 
-                            type="email" required
-                            className="w-full bg-gray-900 text-white p-3 rounded border border-gray-600 focus:border-purple-500 focus:outline-none"
-                            value={email} onChange={e => setEmail(e.target.value)}
-                        />
-                    </div>
-                    <div>
-                         <label className="block text-gray-400 text-sm mb-1">{t('passwordLabel')}</label>
-                        <input 
-                            type="password" required
-                            className="w-full bg-gray-900 text-white p-3 rounded border border-gray-600 focus:border-purple-500 focus:outline-none"
-                            value={password} onChange={e => setPassword(e.target.value)}
-                        />
-                    </div>
-                    <button 
-                        type="submit" 
-                        disabled={loading}
-                        className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50"
-                    >
-                        {loading ? '...' : (isRegistering ? t('registerButton') : t('loginButton'))}
-                    </button>
-                </form>
-                <div className="mt-4 text-center">
-                    <button 
-                        onClick={() => setIsRegistering(!isRegistering)}
-                        className="text-purple-400 text-sm hover:underline"
-                    >
-                        {isRegistering ? t('authSwitchToLogin') : t('authSwitchToRegister')}
-                    </button>
-                </div>
-             </div>
-        </div>
-    )
-}
 
 const getClosestAspectRatio = (width: number, height: number): '1:1' | '16:9' | '9:16' | '4:3' | '3:4' => {
     const ratio = width / height;
@@ -408,8 +488,9 @@ const getClosestAspectRatio = (width: number, height: number): '1:1' | '16:9' | 
 const App: React.FC = () => {
   const [lang, setLang] = useState<Language>('zh');
   const [hasKey, setHasKey] = useState<boolean>(false);
-  const [appState, setAppState] = useState<'setup' | 'auth' | 'app'>('setup');
+  const [appState, setAppState] = useState<'landing' | 'app'>('landing');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [firebaseInitialized, setFirebaseInitialized] = useState(false);
   
   // App State
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
@@ -428,12 +509,11 @@ const App: React.FC = () => {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
+  const [isPanMode, setIsPanMode] = useState(false);
   const [isComparing, setIsComparing] = useState<boolean>(false);
   const [isLayoutEditorOpen, setIsLayoutEditorOpen] = useState(false);
   const [editingImage, setEditingImage] = useState<UploadedImage | null>(null);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
-  const [creditTargetEmail, setCreditTargetEmail] = useState('');
-  const [creditAmount, setCreditAmount] = useState(50);
   const [adminMsg, setAdminMsg] = useState('');
   const [showPermissionHelp, setShowPermissionHelp] = useState(false);
 
@@ -453,6 +533,56 @@ const App: React.FC = () => {
   }, [lang]);
 
   const selectedImage = uploadedImages.find(img => img.id === selectedImageId) || null;
+
+  // Auto-fit image to container
+  const fitImageToScreen = useCallback(() => {
+    if (!selectedImage) return;
+    
+    // Use a small timeout to ensure DOM is ready if switching views
+    setTimeout(() => {
+        const container = imageContainerRef.current;
+        if (!container) return;
+        
+        const img = new Image();
+        img.src = selectedImage.dataUrl;
+        img.onload = () => {
+             const padding = 20;
+             const w = container.clientWidth;
+             const h = container.clientHeight;
+             if (w === 0 || h === 0) return;
+             
+             const scaleX = (w - padding) / img.naturalWidth;
+             const scaleY = (h - padding) / img.naturalHeight;
+             const scale = Math.min(scaleX, scaleY);
+             
+             // Fit exact
+             setZoom(scale); 
+             setPan({ x: 0, y: 0 });
+        };
+    }, 50);
+  }, [selectedImage]);
+
+  // Trigger fit when image changes or window resizes
+  useEffect(() => {
+      if (selectedImageId) {
+          fitImageToScreen();
+      }
+  }, [selectedImageId, fitImageToScreen]);
+  
+  // Also trigger when window resizes
+  useEffect(() => {
+      const handleResize = () => fitImageToScreen();
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+  }, [fitImageToScreen]);
+
+  // Re-fit when coming back from result view
+  useEffect(() => {
+      if (selectedImageId && !loading && !apiResult.imageUrl) {
+          fitImageToScreen();
+      }
+  }, [selectedImageId, loading, apiResult.imageUrl, fitImageToScreen]);
+
 
   // Init Firebase check
   useEffect(() => {
@@ -478,20 +608,17 @@ const App: React.FC = () => {
     if (isFirebaseConfigured()) {
         try {
             initializeFirebase();
-            setAppState('auth');
+            setFirebaseInitialized(true);
+            // Stay on landing page until auth state changes or user logs in
         } catch (e) {
             console.error("Failed to initialize firebase with stored config", e);
-            setAppState('setup');
         }
-    } else {
-        setAppState('setup');
     }
   }, []);
 
   // Auth Listener
   useEffect(() => {
-    if (appState === 'setup') return;
-    
+    if (!firebaseInitialized) return;
     const auth = getAuthInstance();
     if (!auth) return;
 
@@ -509,11 +636,11 @@ const App: React.FC = () => {
             }
         } else {
             setUserProfile(null);
-            setAppState('auth');
+            setAppState('landing');
         }
     });
     return () => unsubscribe();
-  }, [appState]);
+  }, [appState, firebaseInitialized]);
 
   // API Key Check
   useEffect(() => {
@@ -541,31 +668,28 @@ const App: React.FC = () => {
       }
   };
   
-  const handleSetupSave = (config: FirebaseConfig) => {
+  const handleConfigSave = (config: FirebaseConfig) => {
       try {
           initializeFirebase(config);
-          setAppState('auth');
+          setFirebaseInitialized(true);
+          // Don't change appState immediately, let the user log in
       } catch (e: any) {
           alert(e.message);
       }
   };
-
-  const handleAdminAddCredits = async () => {
-      try {
-          await addCreditsByEmail(creditTargetEmail, Number(creditAmount));
-          setAdminMsg(t('creditsAddedSuccess'));
-          setCreditTargetEmail('');
-      } catch (e: any) {
-          if (e.code === 'permission-denied' || e.message?.includes('Missing or insufficient permissions')) {
-             setShowPermissionHelp(true);
-          }
-          setAdminMsg(t('creditsAddedError'));
+  
+  const refreshUserProfile = async () => {
+      if (userProfile) {
+          try {
+              const updated = await getUserProfile(userProfile.uid);
+              setUserProfile(updated);
+          } catch(e) { console.error("Refresh failed", e); }
       }
   };
 
   const handleRefinePrompt = async () => {
     if (!prompt) return;
-    if (!userProfile || userProfile.credits < 5) {
+    if (!userProfile || userProfile.credits < 3) {
         alert(t('notEnoughCredits'));
         return;
     }
@@ -585,10 +709,13 @@ const App: React.FC = () => {
     }
 
     try {
-        await deductCredits(userProfile.uid, 5);
-        setUserProfile(prev => prev ? { ...prev, credits: prev.credits - 5 } : null);
         const enhancedPrompt = await refinePrompt(prompt, imagePart, lang);
-        setPrompt(enhancedPrompt);
+        // Only deduct credits if the prompt actually changed and is not null
+        if (enhancedPrompt && enhancedPrompt !== prompt) {
+            await deductCredits(userProfile.uid, 3);
+            setUserProfile(prev => prev ? { ...prev, credits: prev.credits - 3 } : null);
+            setPrompt(enhancedPrompt);
+        }
     } catch (e: any) {
         console.error("Refine prompt failed", e);
         if (e.code === 'permission-denied' || e.message?.includes('Missing or insufficient permissions')) {
@@ -599,12 +726,33 @@ const App: React.FC = () => {
     }
   };
 
+  const getCostForResolution = (res: ImageResolution) => {
+      switch(res) {
+          case '1K': return 3;
+          case '2K': return 5;
+          case '4K': return 7;
+          default: return 5;
+      }
+  };
+
+  const handleDeductCredits = async (amount: number) => {
+      if (userProfile) {
+          try {
+            await deductCredits(userProfile.uid, amount);
+            setUserProfile(prev => prev ? { ...prev, credits: prev.credits - amount } : null);
+          } catch(e) {
+              console.error("Failed to deduct credits in child component", e);
+          }
+      }
+  }
+
   const handleGenerate = useCallback(async () => {
+    const cost = getCostForResolution(resolution);
     if (!prompt) {
       setError('Please enter a prompt.');
       return;
     }
-    if (!userProfile || userProfile.credits < 5) {
+    if (!userProfile || userProfile.credits < cost) {
         setError(t('notEnoughCredits'));
         return;
     }
@@ -613,7 +761,8 @@ const App: React.FC = () => {
     let capturedCanvasData: string | null = null;
     if (selectedImage && !apiResult.imageUrl) {
         if (canvasRef.current) {
-             capturedCanvasData = canvasRef.current.toDataURL(selectedImage.file.type);
+             // Use png to preserve sharpness of mask lines
+             capturedCanvasData = canvasRef.current.toDataURL('image/png');
         } else {
              // Fallback to original image if canvas is not ready (e.g. strict mode or rapid clicking)
              console.warn("Canvas not ready, using original image");
@@ -627,10 +776,6 @@ const App: React.FC = () => {
     setApiResult({ text: null, imageUrl: null });
 
     try {
-      // Deduct credits first
-      await deductCredits(userProfile.uid, 5);
-      setUserProfile(prev => prev ? { ...prev, credits: prev.credits - 5 } : null);
-
       let effectiveAspectRatio: '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
       if (aspectRatio === '3:2') {
            effectiveAspectRatio = '4:3';
@@ -641,9 +786,16 @@ const App: React.FC = () => {
       }
 
       if (!selectedImage) {
+        // Text-to-Image Generation
         const imageUrl = await generateImageWithGemini3(prompt, effectiveAspectRatio, resolution);
-        setApiResult({ text: null, imageUrl });
+        if (imageUrl) {
+            // Deduct credits only after success
+            await deductCredits(userProfile.uid, cost);
+            setUserProfile(prev => prev ? { ...prev, credits: prev.credits - cost } : null);
+            setApiResult({ text: null, imageUrl });
+        }
       } else {
+        // Image Editing
         let baseImagePart: GeminiImagePart;
         if (previousResultUrl) {
             const [header, base64Data] = previousResultUrl.split(',');
@@ -656,10 +808,13 @@ const App: React.FC = () => {
                throw new Error('Canvas data missing.');
             }
             const base64Data = capturedCanvasData.split(',')[1];
-            baseImagePart = { base64Data, mimeType: selectedImage.file.type };
+            // Force PNG for edits to keep mask crisp
+            baseImagePart = { base64Data, mimeType: 'image/png' };
         }
         
         const imagesToSend: GeminiImagePart[] = [baseImagePart];
+        
+        // Handle reference images from prompt "Image X"
         const imageReferenceKeyword = t('imageReference');
         const regex = new RegExp(`${imageReferenceKeyword}(\\d+)`, 'g');
         const referencedIndices = new Set<number>();
@@ -681,7 +836,9 @@ const App: React.FC = () => {
           }
         });
         
-        const finalPrompt = `${prompt}\n\n${t('instructionalPrompt')}`;
+        const editPrefix = "Edit instruction: ";
+        const finalPrompt = `${editPrefix}${prompt}\n\n${t('instructionalPrompt')}`;
+        
         const response: GenerateContentResponse = await editImageWithGemini(
           imagesToSend,
           finalPrompt,
@@ -702,7 +859,30 @@ const App: React.FC = () => {
         } else {
           throw new Error('Invalid response structure from API.');
         }
-        setApiResult({ text: resultText.trim(), imageUrl: resultImageUrl });
+
+        if (resultImageUrl || resultText) {
+             let contentChanged = true;
+
+             if (selectedImage && resultImageUrl) {
+                  // Determine what was sent to the API to compare against
+                  const sourceDataUrl = previousResultUrl || capturedCanvasData || selectedImage.dataUrl;
+                  
+                  // Compare base64 string length/content to check if image actually changed.
+                  // Sometimes Gemini returns the exact same image if it can't perform the edit.
+                  // Note: Compression might slightly change the base64 even if visual is same, 
+                  // but usually if it refuses to edit, it might return exact same bytes or null.
+                  // Simple strict equality check is a good first line of defense.
+                  if (sourceDataUrl === resultImageUrl) {
+                      contentChanged = false;
+                  }
+             }
+
+             if (contentChanged) {
+                 await deductCredits(userProfile.uid, cost);
+                 setUserProfile(prev => prev ? { ...prev, credits: prev.credits - cost } : null);
+             }
+             setApiResult({ text: resultText.trim(), imageUrl: resultImageUrl });
+        }
       }
     } catch (e: any) {
       console.error(e);
@@ -765,25 +945,7 @@ const App: React.FC = () => {
   
   // Reuse existing helpers
   const handlePanByControl = useCallback((dx: number, dy: number) => { setPan(p => ({ x: p.x + dx, y: p.y + dy })); }, []);
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    if (!imageContainerRef.current) return;
-    e.preventDefault();
-    const rect = imageContainerRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const delta = -e.deltaY * 0.005;
-    setZoom(prevZoom => {
-        const newZoom = Math.max(1, Math.min(3, prevZoom + delta * prevZoom));
-        const scaleFactor = newZoom / prevZoom;
-        const cx = rect.width / 2;
-        const cy = rect.height / 2;
-        setPan(prevPan => ({
-            x: (mouseX - cx) * (1 - scaleFactor) + prevPan.x * scaleFactor,
-            y: (mouseY - cy) * (1 - scaleFactor) + prevPan.y * scaleFactor,
-        }));
-        return newZoom;
-    });
-  }, []);
+  // Removed wheel zooming on canvas to prevent view layout issues, per user request. Zooming is now handled via the controls only.
   const handlePanStart = useCallback((clientX: number, clientY: number) => {
     if (!imageContainerRef.current) return;
     panStartRef.current = { startX: clientX, startY: clientY, startPan: pan };
@@ -794,7 +956,7 @@ const App: React.FC = () => {
     setPan({ x: panStartRef.current.startPan.x + (clientX - panStartRef.current.startX), y: panStartRef.current.startPan.y + (clientY - panStartRef.current.startY) });
   }, [isPanning]);
   const handlePanEnd = useCallback(() => setIsPanning(false), []);
-  const resetView = useCallback(() => { setZoom(1); setPan({ x: 0, y: 0 }); }, []);
+  const resetView = useCallback(() => { fitImageToScreen(); }, [fitImageToScreen]);
   const onMouseDown = (e: React.MouseEvent) => { if (e.button !== 0) return; e.preventDefault(); handlePanStart(e.clientX, e.clientY); };
   const onMouseMove = (e: React.MouseEvent) => { e.preventDefault(); handlePanMove(e.clientX, e.clientY); };
   const onTouchStart = (e: React.TouchEvent) => {
@@ -810,7 +972,7 @@ const App: React.FC = () => {
       const t1 = e.touches[0]; const t2 = e.touches[1];
       const newDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
       const scale = newDist / pinchStartRef.current.dist;
-      const newZoom = Math.max(1, Math.min(3, pinchStartRef.current.zoom * scale));
+      const newZoom = Math.max(0.1, Math.min(10, pinchStartRef.current.zoom * scale));
       if (imageContainerRef.current) {
           const rect = imageContainerRef.current.getBoundingClientRect();
           const startMidOnScreen = { x: pinchStartRef.current.mid.x - rect.left, y: pinchStartRef.current.mid.y - rect.top };
@@ -857,15 +1019,23 @@ const App: React.FC = () => {
   const handleOpenPhotoEditor = (id: string) => { const img = uploadedImages.find(i => i.id === id); if (img) setEditingImage(img); };
   const handleSavePhotoEditor = (id: string, dataUrl: string) => { setUploadedImages(prev => prev.map(img => img.id === id ? { ...img, dataUrl } : img)); setEditingImage(null); };
 
-  if (appState === 'setup') return <SetupScreen onSave={handleSetupSave} t={t} />;
-  if (appState === 'auth') return <AuthScreen t={t} onAuthSuccess={() => {}} />;
+  if (appState === 'landing') return <LandingScreen onConfigSave={handleConfigSave} onAuthSuccess={() => {}} t={t} />;
   if (!hasKey) return <LaunchScreen onConnect={handleConnectApiKey} t={t} />;
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 font-sans relative">
       {showPermissionHelp && <PermissionErrorModal onClose={() => setShowPermissionHelp(false)} />}
       {isLayoutEditorOpen && <LayoutEditor onComplete={handleLayoutComplete} onClose={() => setIsLayoutEditorOpen(false)} t={t} />}
-      {editingImage && <PhotoEditor image={editingImage} onSave={handleSavePhotoEditor} onClose={() => setEditingImage(null)} t={t} />}
+      {editingImage && (
+        <PhotoEditor 
+            image={editingImage} 
+            onSave={handleSavePhotoEditor} 
+            onClose={() => setEditingImage(null)} 
+            t={t} 
+            userCredits={userProfile?.credits || 0}
+            onDeductCredits={handleDeductCredits}
+        />
+      )}
 
       <div className="container mx-auto p-4 lg:p-8">
         <header className="mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
@@ -900,19 +1070,8 @@ const App: React.FC = () => {
                     <span className="text-xl">{isAdminPanelOpen ? '−' : '+'}</span>
                 </div>
                 {isAdminPanelOpen && (
-                    <div className="mt-4 flex flex-col md:flex-row gap-4 items-end">
-                        <div className="flex-grow">
-                            <label className="block text-xs text-gray-400 mb-1">{t('targetEmailLabel')}</label>
-                            <input type="email" value={creditTargetEmail} onChange={e => setCreditTargetEmail(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded p-2 text-sm" />
-                        </div>
-                        <div className="w-32">
-                             <label className="block text-xs text-gray-400 mb-1">{t('amountLabel')}</label>
-                             <input type="number" value={creditAmount} onChange={e => setCreditAmount(Number(e.target.value))} className="w-full bg-gray-800 border border-gray-600 rounded p-2 text-sm" />
-                        </div>
-                        <button onClick={handleAdminAddCredits} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-bold text-sm">
-                            {t('addCreditsButton')}
-                        </button>
-                        {adminMsg && <span className="text-sm text-green-400">{adminMsg}</span>}
+                    <div className="mt-4 animate-fade-in">
+                        <AdminUserList t={t} onCreditsUpdated={refreshUserProfile} />
                     </div>
                 )}
             </div>
@@ -921,10 +1080,23 @@ const App: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Column */}
           <div className="flex flex-col gap-4 bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700">
-             <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-300">
-                {apiResult.imageUrl && !loading ? t('resultTitle') : t('canvasTitle')}
-              </h2>
+             <div className="flex flex-wrap justify-between items-center gap-2">
+              <div className="flex items-center gap-4">
+                  <h2 className="text-2xl font-bold text-gray-300">
+                    {apiResult.imageUrl && !loading ? t('resultTitle') : t('canvasTitle')}
+                  </h2>
+                  {!apiResult.imageUrl && !loading && selectedImage && (
+                        <ZoomControls 
+                            zoom={zoom} 
+                            onZoomChange={setZoom} 
+                            onFit={fitImageToScreen} 
+                            t={t} 
+                            isPanMode={isPanMode}
+                            onTogglePan={() => setIsPanMode(!isPanMode)}
+                        />
+                  )}
+              </div>
+
               {apiResult.imageUrl && !loading && (
                 <button onClick={handleClearResult} className="flex items-center gap-2 bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg">
                     <RedrawIcon className="w-4 h-4"/> {t('backToEditorButton')}
@@ -939,10 +1111,11 @@ const App: React.FC = () => {
                     apiResult={apiResult}
                     t={t}
                     onEditResult={handleEditResult}
+                    originalImageSrc={selectedImage?.dataUrl || null}
                  />
             ) : (
                 // Canvas View
-                 <div className="relative w-full aspect-[4/3] bg-gray-900 rounded-lg overflow-hidden border-2 border-dashed border-gray-700 group cursor-crosshair">
+                 <div className={`relative w-full aspect-[4/3] bg-gray-900 rounded-lg overflow-hidden border-2 border-dashed border-gray-700 group ${isPanMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}>
                     <div 
                         ref={imageContainerRef}
                         className="w-full h-full flex items-center justify-center overflow-hidden touch-none"
@@ -953,7 +1126,7 @@ const App: React.FC = () => {
                         onTouchStart={onTouchStart}
                         onTouchMove={onTouchMove}
                         onTouchEnd={onTouchEnd}
-                        onWheel={handleWheel}
+                        // Removed onWheel to prevent zooming via mouse wheel
                     >
                     {!selectedImage ? (
                         <div className="flex flex-col items-center text-gray-500 cursor-pointer hover:text-gray-400 transition-colors" onClick={handleUploadClick}>
@@ -968,6 +1141,7 @@ const App: React.FC = () => {
                                 imageSrc={selectedImage.dataUrl}
                                 brushSize={brushSize}
                                 brushColor={brushColor}
+                                enableDrawing={!isPanMode}
                             />
                         </div>
                     )}
@@ -980,17 +1154,6 @@ const App: React.FC = () => {
                         multiple
                         className="hidden"
                     />
-                    {selectedImage && zoom > 1 && <PanControl onPan={handlePanByControl} />}
-                    {selectedImage && (
-                        <div className="absolute top-2 right-2 flex gap-2">
-                             <div className="flex items-center bg-gray-800/80 rounded-lg p-1 backdrop-blur-sm">
-                                <button onClick={() => setZoom(z => Math.max(1, z - 0.2))} className="p-1.5 hover:bg-gray-700 rounded text-gray-300"><ZoomOutIcon className="w-5 h-5"/></button>
-                                <span className="text-xs w-8 text-center">{Math.round(zoom * 100)}%</span>
-                                <button onClick={() => setZoom(z => Math.min(3, z + 0.2))} className="p-1.5 hover:bg-gray-700 rounded text-gray-300"><ZoomInIcon className="w-5 h-5"/></button>
-                                <button onClick={resetView} className="p-1.5 hover:bg-gray-700 rounded text-gray-300 border-l border-gray-600 ml-1"><ArrowsPointingOutIcon className="w-5 h-5"/></button>
-                            </div>
-                        </div>
-                    )}
                 </div>
             )}
 
@@ -1083,11 +1246,17 @@ const App: React.FC = () => {
                               <button
                                 key={res}
                                 onClick={() => setResolution(res)}
+                                title={res === '1K' ? t('cost1K' as any) : res === '2K' ? t('cost2K' as any) : t('cost4K' as any)}
                                 className={`flex-1 text-xs font-medium py-1.5 rounded-md transition-colors ${resolution === res ? 'bg-purple-600 text-white shadow-sm' : 'text-gray-300 hover:text-white'}`}
                               >
                                   {res}
                               </button>
                           ))}
+                      </div>
+                      <div className="text-right mt-1">
+                          <span className="text-xs text-yellow-500">
+                            {resolution === '1K' ? t('cost1K' as any) : resolution === '2K' ? t('cost2K' as any) : t('cost4K' as any)}
+                          </span>
                       </div>
                   </div>
               </div>
