@@ -197,7 +197,7 @@ export const translations = {
     downloadButton: "Download",
     editResultButton: "Edit This",
     instructionalPrompt: "The red lines are a mask. Edit only that area. If no mask, edit globally.",
-    rateLimitError: "API limit exceeded. Try again later.",
+    rateLimitError: "Too many requests. Please wait 1 minute.", // Updated
     zoomInButton: "Zoom In",
     zoomOutButton: "Zoom Out",
     resetViewButton: "Reset View",
@@ -388,7 +388,7 @@ export const translations = {
     downloadButton: "下載",
     editResultButton: "編輯此圖",
     instructionalPrompt: "重要：紅線是遮罩，請只編輯遮罩區域。若無紅線則編輯全圖。",
-    rateLimitError: "API 使用量已達上限。",
+    rateLimitError: "請求過於頻繁，請稍等一分鐘再試 (API 速率限制)。", // Updated
     zoomInButton: "放大",
     zoomOutButton: "縮小",
     resetViewButton: "重置",
