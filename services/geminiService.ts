@@ -51,7 +51,7 @@ const handleGeminiError = async (error: unknown, context: string, attempt: numbe
 
     // Handle Permissions (403 / PERMISSION_DENIED)
     if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) {
-        throw new Error('PERMISSION_DENIED (403): 權限被拒。\n\n【關鍵解決方案】：\n您的 Key 在 Studio 能用但在這裡不能用，通常是因為專案未啟用 API 服務。\n\n1. 請前往 Google Cloud Console > "API 和服務" > "程式庫" (Library)。\n2. 搜尋 "Generative Language API"。\n3. 點擊進入並按下藍色的「啟用 (ENABLE)」按鈕。\n\n若已啟用，請暫時將 Key 的網址限制設為「無 (None)」來排除網址驗證問題。');
+        throw new Error('PERMISSION_DENIED (403): 權限被拒。\n\n【最終解決方案 / FINAL SOLUTION】\n既然您已確認 API 服務已啟用 (綠色打勾)，那麼問題 100% 出在「網站限制」。\n\n請立即執行以下步驟：\n1. 回到 Google Cloud Console 的 Key 設定頁面。\n2. 將「應用程式限制 (Application restrictions)」改選為 **「無 (None)」**。\n3. 儲存並等待 2 分鐘。\n\n這是唯一能確認 Key 是否正常的測試方法。');
     }
 
     throw new Error(`${context} Error: ${msg}`);
