@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import type { TFunction } from '../types';
-import { KeyIcon, ArrowRightIcon, SparklesIcon } from './Icons';
+import { KeyIcon, ArrowRightIcon, SparklesIcon, TrashIcon } from './Icons';
 
 interface ApiKeyWelcomeModalProps {
     onSave: (apiKey: string) => void;
@@ -18,6 +19,16 @@ export const ApiKeyWelcomeModal: React.FC<ApiKeyWelcomeModalProps> = ({ onSave, 
         }
     };
 
+    const handleClear = () => {
+        if (window.confirm("確定要清除瀏覽器中的 Key 並重置嗎？\n如果您在 GitHub 有設定 Secrets，重置後將會使用 GitHub 的設定。")) {
+            localStorage.removeItem('custom_gemini_api_key');
+            window.location.reload();
+        }
+    }
+
+    // Check if there's a key currently in local storage to decide if we show the clear button
+    const hasStoredKey = !!localStorage.getItem('custom_gemini_api_key');
+
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/95 backdrop-blur-md animate-fade-in">
             <div className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md border border-purple-500/30 overflow-hidden">
@@ -25,18 +36,19 @@ export const ApiKeyWelcomeModal: React.FC<ApiKeyWelcomeModalProps> = ({ onSave, 
                     <div className="inline-block p-3 bg-white/10 rounded-full mb-4">
                         <SparklesIcon className="w-10 h-10 text-yellow-300" />
                     </div>
-                    <h2 className="text-2xl font-bold text-white mb-2">歡迎使用 Ivan Ai Photo</h2>
-                    <p className="text-purple-200 text-sm">Bring Your Own Key (BYOK) 平台</p>
+                    <h2 className="text-2xl font-bold text-white mb-2">API Key 設定</h2>
+                    <p className="text-purple-200 text-sm">Bring Your Own Key (BYOK)</p>
                 </div>
                 
                 <div className="p-8 space-y-6">
                     <div className="text-gray-300 text-sm leading-relaxed">
                         <p className="mb-4">
-                            本平台提供強大的 AI 修圖介面，並使用 <strong>Google Gemini</strong> 模型。
-                            為了確保服務穩定，請使用您自己的 API Key。
+                            本平台使用 <strong>Google Gemini</strong> 模型。
+                            為確保穩定性與配額，請輸入您的 API Key。
                         </p>
                         <ul className="list-disc list-inside space-y-1 text-gray-400 pl-2">
-                            <li>您的 Key 僅儲存在瀏覽器，不會上傳</li>
+                            <li>文字生成配額較高，生圖配額較低。</li>
+                            <li>若遇到 RATE_LIMIT，請稍後再試或更換 Key。</li>
                         </ul>
                     </div>
 
@@ -67,13 +79,24 @@ export const ApiKeyWelcomeModal: React.FC<ApiKeyWelcomeModalProps> = ({ onSave, 
                         </div>
                     </div>
 
-                    <button 
-                        onClick={handleSave}
-                        disabled={inputKey.length < 10}
-                        className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-xl shadow-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                    >
-                        開始使用
-                    </button>
+                    <div className="flex gap-3">
+                        <button 
+                            onClick={handleSave}
+                            disabled={inputKey.length < 10}
+                            className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-xl shadow-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        >
+                            儲存並開始
+                        </button>
+                        {hasStoredKey && (
+                            <button
+                                onClick={handleClear}
+                                className="px-4 py-3 bg-red-900/30 hover:bg-red-900/50 text-red-300 border border-red-800 rounded-xl transition-colors flex items-center justify-center"
+                                title="清除舊 Key / 使用預設值"
+                            >
+                                <TrashIcon className="w-5 h-5" />
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

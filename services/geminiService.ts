@@ -34,12 +34,12 @@ const handleGeminiError = (error: unknown, context: string): never => {
     const msg = error.message;
     if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')) {
       if (context.includes("Image")) {
-          throw new Error('RATE_LIMIT_EXCEEDED: Image Generation Quota Full (Check Google AI Studio)');
+          throw new Error('RATE_LIMIT_EXCEEDED: 生圖配額已滿 (Image Quota Full)。請更換 Key 或等待。');
       }
-      throw new Error('RATE_LIMIT_EXCEEDED (API Quota Full)');
+      throw new Error('RATE_LIMIT_EXCEEDED: API 配額已滿 (Quota Full)。');
     }
     if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) {
-      throw new Error('PERMISSION_DENIED (Check API Key)');
+      throw new Error('PERMISSION_DENIED: API Key 無效或權限不足。');
     }
     throw new Error(`${context} Error: ${msg}`);
   }
@@ -114,7 +114,7 @@ export const editImageWithGemini = async (
     return { response };
 
   } catch (error: any) {
-      handleGeminiError(error, "Gemini 2.5 API");
+      handleGeminiError(error, "Gemini 2.5 Image API");
   }
 };
 
@@ -158,19 +158,6 @@ export const refinePrompt = async (
     console.error("Error calling Gemini API for refinement:", error);
     return prompt; 
   }
-};
-
-export interface WatermarkParams {
-    text: string;
-    subText?: string;
-    style: string;
-    theme?: string;
-    icon?: string;
-    color?: string;
-}
-
-export const generateWatermark = async (params: WatermarkParams): Promise<string> => {
-    return ""; 
 };
 
 // NEW: Video Prompt Generation
@@ -230,6 +217,8 @@ export const generatePoeticText = async (
         Line 3: Poem line 2
         Line 4: Poem line 3
         Line 5: Poem line 4
+        
+        Strictly follow the 5-line structure.
         `;
     } else if (languageLabel.includes("中英文")) {
         languageInstruction = "Use Traditional Chinese AND English translation.";
@@ -255,8 +244,9 @@ export const generatePoeticText = async (
     Strict Instructions:
     1. ${languageInstruction}
     2. ${formatInstruction}
-    3. Output ONLY the raw text lines. No "Title:" labels, no markdown code blocks.
+    3. Output ONLY the raw text lines. NO "Title:" labels, NO markdown code blocks, NO "Here is a poem".
     4. Be creative, visual, and capture the mood of the image.
+    5. Do NOT output the text "伊凡水墨". Write a new, original poem based on the image.
     `;
 
     const parts: any[] = [];
@@ -296,6 +286,6 @@ export const generatePoeticText = async (
 
     } catch (error) {
         console.error("Poetic generation failed:", error);
-        return ""; 
+        throw error; // Rethrow to let UI handle it
     }
 };
