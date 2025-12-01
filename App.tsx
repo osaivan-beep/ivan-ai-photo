@@ -678,10 +678,7 @@ const App: React.FC = () => {
       }
     } catch (e: any) {
       console.error(e);
-      const msg = e.message || '';
-      if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) setError('API Permission Denied. Please check your custom API key.');
-      else if (msg.includes('RESOURCE_EXHAUSTED')) setError(t('rateLimitError'));
-      else setError(msg);
+      setError(e.message || "An error occurred.");
       setApiResult({ text: null, imageUrl: previousResultUrl });
     } finally {
       setLoading(false);
@@ -833,7 +830,7 @@ const App: React.FC = () => {
                 <h1 className="text-4xl lg:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">
                     {t('title')} 
                     <span className="text-xs bg-gray-800 text-gray-400 px-2 py-1 rounded border border-gray-600 align-middle ml-2 inline-flex items-center gap-1">
-                        Gemini 2.5 (v2025.12.03)
+                        Gemini 2.5 (v2025.12.04)
                         {isCustomKey ? <span className="text-green-400 ml-1">● Custom Key</span> : <span className="text-yellow-500 ml-1">● Default</span>}
                         <span className="text-[10px] text-gray-500 font-mono ml-1" title="Active Key ID">
                             ({getActiveKeyMasked()})
@@ -1095,16 +1092,11 @@ const App: React.FC = () => {
               )}
 
               {error && (
-                <div className="p-4 bg-red-900/30 border border-red-500/50 rounded-xl text-red-200 text-sm">
+                <div className="p-4 bg-red-900/30 border border-red-500/50 rounded-xl text-red-200 text-sm whitespace-pre-line">
                   <p className="font-bold flex items-center gap-2">
                     <span className="text-xl">⚠️</span> {t('errorTitle')}
                   </p>
                   <p className="mt-1">{error}</p>
-                   {error === 'PERMISSION_DENIED_UI' && (
-                        <p className="mt-2 text-xs text-red-300">
-                             Tip: Check your API Key permissions or quota.
-                        </p>
-                   )}
                 </div>
               )}
             </div>

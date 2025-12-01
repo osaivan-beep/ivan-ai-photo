@@ -28,19 +28,32 @@ export const getActiveKeyMasked = (): string => {
     return `...${key.slice(-4)}`;
 };
 
-const handleGeminiError = (error: unknown, context: string): never => {
-  console.error(`Error calling ${context}:`, error);
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const handleGeminiError = async (error: unknown, context: string, attempt: number, maxRetries: number): Promise<void> => {
+  console.error(`Error calling ${context} (Attempt ${attempt}/${maxRetries}):`, error);
+  
   if (error instanceof Error) {
     const msg = error.message;
+    
+    // Handle Rate Limits (429 / RESOURCE_EXHAUSTED)
     if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')) {
-      if (context.includes("Image")) {
-          throw new Error('RATE_LIMIT_EXCEEDED: 生圖配額已滿 (Image Quota Full)。請更換 Key 或等待。');
-      }
-      throw new Error('RATE_LIMIT_EXCEEDED: API 配額已滿 (Quota Full)。');
+        if (attempt < maxRetries) {
+            console.warn(`Rate limit hit. Retrying in ${2 * attempt} seconds...`);
+            await delay(2000 * attempt); // Exponential backoff: 2s, 4s, 6s...
+            return; // Return to retry loop
+        }
+        if (context.includes("Image")) {
+            throw new Error('RATE_LIMIT_EXCEEDED: 生圖配額已滿 (Image Quota Full)。請更換 Key 或等待。');
+        }
+        throw new Error('RATE_LIMIT_EXCEEDED: API 配額已滿 (Quota Full)。請稍後再試。');
     }
+
+    // Handle Permissions (403 / PERMISSION_DENIED)
     if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) {
-      throw new Error('PERMISSION_DENIED: API Key 無效或權限不足。');
+        throw new Error('PERMISSION_DENIED (403): 權限被拒。\n\n解決建議：\n1. 請至 Google Cloud Console 檢查此 Key 的「網站限制」。\n2. 若無法排除，請暫時將應用程式限制設為「無 (None)」來測試是否為網址問題。\n3. 確認已啟用 "Generative Language API" 服務。');
     }
+
     throw new Error(`${context} Error: ${msg}`);
   }
   throw new Error(`An unknown error occurred while communicating with the ${context}.`);
@@ -55,41 +68,39 @@ export const generateImageWithGemini = async (
   if (!apiKey) throw new Error("API Key is missing. Please set a custom key.");
   
   const ai = new GoogleGenAI({ apiKey });
-  
-  const extractImage = (response: any) => {
-      let resultImageUrl = '';
-      if (response.candidates && response.candidates[0] && response.candidates[0].content && response.candidates[0].content.parts) {
-          for (const part of response.candidates[0].content.parts) {
-              if (part.inlineData) {
-                  resultImageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                  break; 
-              }
-          }
+  const maxRetries = 3;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const config: any = {};
+        if (aspectRatio) {
+            config.imageConfig = { aspectRatio: aspectRatio };
+        }
+
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash-image',
+          contents: { parts: [{ text: prompt }] },
+          config: config,
+        });
+
+        let resultImageUrl = '';
+        if (response.candidates && response.candidates[0]?.content?.parts) {
+            for (const part of response.candidates[0].content.parts) {
+                if (part.inlineData) {
+                    resultImageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                    break; 
+                }
+            }
+        }
+
+        if (!resultImageUrl) throw new Error('No image generated.');
+        return { imageUrl: resultImageUrl };
+
+      } catch (error: any) {
+         await handleGeminiError(error, "Gemini 2.5 Image API", attempt, maxRetries);
       }
-      return resultImageUrl;
-  };
-
-  try {
-    // Using Gemini 2.5 Flash Image
-    const config: any = {};
-    // Only pass aspect ratio if strictly provided (Text-to-Image)
-    if (aspectRatio) {
-        config.imageConfig = { aspectRatio: aspectRatio };
-    }
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: { parts: [{ text: prompt }] },
-      config: config,
-    });
-
-    const img = extractImage(response);
-    if (!img) throw new Error('No image generated.');
-    return { imageUrl: img };
-
-  } catch (error: any) {
-     handleGeminiError(error, "Gemini 2.5 Image API");
   }
+  throw new Error("Failed to generate image after retries.");
 };
 
 export const editImageWithGemini = async (
@@ -99,6 +110,7 @@ export const editImageWithGemini = async (
   const apiKey = getActiveKey();
   if (!apiKey) throw new Error("API Key is missing. Please set a custom key.");
   const ai = new GoogleGenAI({ apiKey });
+  const maxRetries = 3;
 
   const imageParts = images.map(image => ({
       inlineData: { data: image.base64Data, mimeType: image.mimeType },
@@ -106,16 +118,19 @@ export const editImageWithGemini = async (
   const textPart = { text: prompt };
   const allParts = [...imageParts, textPart];
 
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image', 
-      contents: { parts: allParts },
-    });
-    return { response };
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash-image', 
+          contents: { parts: allParts },
+        });
+        return { response };
 
-  } catch (error: any) {
-      handleGeminiError(error, "Gemini 2.5 Image API");
+      } catch (error: any) {
+          await handleGeminiError(error, "Gemini 2.5 Image API", attempt, maxRetries);
+      }
   }
+  throw new Error("Failed to edit image after retries.");
 };
 
 export const refinePrompt = async (
@@ -124,7 +139,7 @@ export const refinePrompt = async (
     language: string = 'en'
 ): Promise<string> => {
   const apiKey = getActiveKey();
-  if (!apiKey) return prompt; // Fail gracefully for text
+  if (!apiKey) return prompt; 
   
   const ai = new GoogleGenAI({ apiKey });
   try {
