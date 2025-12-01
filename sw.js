@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'ivan-ai-photo-cache-v40000';
+const CACHE_NAME = 'ivan-ai-photo-cache-v40002'; // Updated version to bust cache
 const APP_SHELL_URLS = [
   '/',
   '/index.html',
@@ -25,7 +25,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting(); // Force activation immediately
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('Opened cache v40000');
+      console.log('Opened cache ' + CACHE_NAME);
       return cache.addAll(APP_SHELL_URLS);
     })
   );
@@ -50,6 +50,7 @@ self.addEventListener('activate', (event) => {
       Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
+            console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
