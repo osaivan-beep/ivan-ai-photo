@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'ivan-ai-photo-cache-v40010'; // Updated to v40010 to force refresh
+const CACHE_NAME = 'ivan-ai-photo-cache-v40013'; // Updated to v40013 to force refresh
 const APP_SHELL_URLS = [
   '/',
   '/index.html',
