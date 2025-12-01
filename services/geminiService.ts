@@ -2,9 +2,6 @@
 import { GoogleGenAI, Modality, type GenerateContentResponse } from '@google/genai';
 import type { GeminiImagePart, ImageResolution } from '../types';
 
-// Default key acts only as a fallback
-const DEFAULT_FALLBACK_KEY = "AIzaSyCeR52YbrlvyOqk8-cOyTwEVZ9TYRrbdCg";
-
 // Dynamic retrieval function
 const getActiveKey = (): string => {
     try {
@@ -15,7 +12,8 @@ const getActiveKey = (): string => {
     } catch (e) {
         console.warn("Failed to access localStorage", e);
     }
-    return DEFAULT_FALLBACK_KEY;
+    // Return the injected key from build process (GitHub Secret or Fallback)
+    return process.env.API_KEY || "";
 };
 
 const handleGeminiError = (error: unknown, context: string): never => {
