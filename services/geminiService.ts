@@ -13,7 +13,11 @@ const getActiveKey = (): string => {
         console.warn("Failed to access localStorage", e);
     }
     // Return the injected key from build process (GitHub Secret or Fallback)
-    return process.env.API_KEY || "";
+    const envKey = process.env.API_KEY;
+    if (!envKey) {
+        console.error("API Key is missing in environment variables!");
+    }
+    return envKey || "";
 };
 
 const handleGeminiError = (error: unknown, context: string): never => {
@@ -21,10 +25,10 @@ const handleGeminiError = (error: unknown, context: string): never => {
   if (error instanceof Error) {
     const msg = error.message;
     if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')) {
-      throw new Error('RATE_LIMIT_EXCEEDED');
+      throw new Error('RATE_LIMIT_EXCEEDED (API Quota Full)');
     }
     if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) {
-      throw new Error('PERMISSION_DENIED');
+      throw new Error('PERMISSION_DENIED (Check API Key)');
     }
     throw new Error(`${context} Error: ${msg}`);
   }
