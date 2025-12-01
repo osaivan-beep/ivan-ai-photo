@@ -11,8 +11,8 @@ export default defineConfig(({ mode }) => {
   // Priority: 
   // 1. System Environment Variable (process.env.API_KEY) - This is what GitHub Actions uses.
   // 2. .env file loaded by loadEnv (env.API_KEY) - This is for local development with .env file.
-  // 3. Hardcoded Fallback - This is the last resort (the shared key).
-  const apiKey = process.env.API_KEY || env.API_KEY || "AIzaSyCeR52YbrlvyOqk8-cOyTwEVZ9TYRrbdCg";
+  // 3. Fallback to empty string. DO NOT use a hardcoded shared key here, as it leads to rate limiting for everyone.
+  const apiKey = process.env.API_KEY || env.API_KEY || "";
 
   return {
     plugins: [react()],
