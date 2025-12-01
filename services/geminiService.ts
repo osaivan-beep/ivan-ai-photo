@@ -15,9 +15,17 @@ const getActiveKey = (): string => {
     // Return the injected key from build process (GitHub Secret or Fallback)
     const envKey = process.env.API_KEY;
     if (!envKey) {
-        console.error("API Key is missing in environment variables!");
+        console.warn("API Key is missing in environment variables!");
     }
     return envKey || "";
+};
+
+// Helper to show the user which key is active (security safe)
+export const getActiveKeyMasked = (): string => {
+    const key = getActiveKey();
+    if (!key) return "No Key";
+    if (key.length <= 4) return "****";
+    return `...${key.slice(-4)}`;
 };
 
 const handleGeminiError = (error: unknown, context: string): never => {
@@ -25,6 +33,9 @@ const handleGeminiError = (error: unknown, context: string): never => {
   if (error instanceof Error) {
     const msg = error.message;
     if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')) {
+      if (context.includes("Image")) {
+          throw new Error('RATE_LIMIT_EXCEEDED: Image Generation Quota Full (Check Google AI Studio)');
+      }
       throw new Error('RATE_LIMIT_EXCEEDED (API Quota Full)');
     }
     if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) {
@@ -41,6 +52,8 @@ export const generateImageWithGemini = async (
 ): Promise<{ imageUrl: string }> => {
   
   const apiKey = getActiveKey();
+  if (!apiKey) throw new Error("API Key is missing. Please set a custom key.");
+  
   const ai = new GoogleGenAI({ apiKey });
   
   const extractImage = (response: any) => {
@@ -84,6 +97,7 @@ export const editImageWithGemini = async (
   prompt: string
 ): Promise<{ response: GenerateContentResponse }> => {
   const apiKey = getActiveKey();
+  if (!apiKey) throw new Error("API Key is missing. Please set a custom key.");
   const ai = new GoogleGenAI({ apiKey });
 
   const imageParts = images.map(image => ({
@@ -110,6 +124,8 @@ export const refinePrompt = async (
     language: string = 'en'
 ): Promise<string> => {
   const apiKey = getActiveKey();
+  if (!apiKey) return prompt; // Fail gracefully for text
+  
   const ai = new GoogleGenAI({ apiKey });
   try {
     let systemInstruction = "";
@@ -160,6 +176,8 @@ export const generateWatermark = async (params: WatermarkParams): Promise<string
 // NEW: Video Prompt Generation
 export const generateVideoPrompt = async (image: GeminiImagePart, language: string = 'en'): Promise<string> => {
     const apiKey = getActiveKey();
+    if (!apiKey) return "Error: No API Key";
+
     const ai = new GoogleGenAI({ apiKey });
 
     const systemInstruction = language === 'zh' 
@@ -196,6 +214,7 @@ export const generatePoeticText = async (
     imagePart?: GeminiImagePart
 ): Promise<string> => {
     const apiKey = getActiveKey();
+    if (!apiKey) throw new Error("No API Key");
     const ai = new GoogleGenAI({ apiKey });
 
     // Determine specific language instructions
