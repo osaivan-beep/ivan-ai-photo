@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState, useImperativeHandle, forwardRef, useCallback } from 'react';
 
 interface CanvasEditorProps {
@@ -28,35 +29,30 @@ export const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
       const img = new Image();
       img.crossOrigin = "anonymous";
       
-      // Reset state for new image immediately
+      // Reset state for new image
       imageLoadedRef.current = false;
       setImage(null);
-      // Clear dimensions to prevent drawing on wrong size canvas
-      setDimensions({ width: 0, height: 0 });
 
       img.onload = () => {
         imageLoadedRef.current = true;
         setImage(img);
         setDimensions({ width: img.naturalWidth, height: img.naturalHeight });
         
-        // Use requestAnimationFrame to ensure DOM has updated with new dimensions
-        requestAnimationFrame(() => {
-            const mainCanvas = mainCanvasRef.current;
-            const previewCanvas = previewCanvasRef.current;
-            
-            if (mainCanvas && previewCanvas) {
-              mainCanvas.width = img.naturalWidth;
-              mainCanvas.height = img.naturalHeight;
-              previewCanvas.width = img.naturalWidth;
-              previewCanvas.height = img.naturalHeight;
-              
-              const ctx = mainCanvas.getContext('2d');
-              if (ctx) {
-                ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
-                ctx.drawImage(img, 0, 0);
-              }
-            }
-        });
+        const mainCanvas = mainCanvasRef.current;
+        const previewCanvas = previewCanvasRef.current;
+        
+        if (mainCanvas && previewCanvas) {
+          mainCanvas.width = img.naturalWidth;
+          mainCanvas.height = img.naturalHeight;
+          previewCanvas.width = img.naturalWidth;
+          previewCanvas.height = img.naturalHeight;
+          
+          const ctx = mainCanvas.getContext('2d');
+          if (ctx) {
+            ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+            ctx.drawImage(img, 0, 0);
+          }
+        }
       };
       img.src = imageSrc;
     }, [imageSrc]);

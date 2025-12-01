@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import type { UploadedImage, TFunction } from '../types';
-import { CloseIcon, PlusIcon, EditIcon, LayoutIcon } from './Icons';
+import { CloseIcon, PlusIcon, EditIcon, StampIcon } from './Icons';
 
 interface ThumbnailManagerProps {
   images: UploadedImage[];
@@ -11,10 +12,10 @@ interface ThumbnailManagerProps {
   t: TFunction;
   onReorder: (images: UploadedImage[]) => void;
   onEdit: (id: string) => void;
-  onOpenLayoutEditor: () => void;
+  onOpenWatermarkGenerator: () => void;
 }
 
-export const ThumbnailManager: React.FC<ThumbnailManagerProps> = ({ images, selectedImageId, onSelect, onDelete, onAddImage, t, onReorder, onEdit, onOpenLayoutEditor }) => {
+export const ThumbnailManager: React.FC<ThumbnailManagerProps> = ({ images, selectedImageId, onSelect, onDelete, onAddImage, t, onReorder, onEdit, onOpenWatermarkGenerator }) => {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
@@ -89,13 +90,13 @@ export const ThumbnailManager: React.FC<ThumbnailManagerProps> = ({ images, sele
         <h3 className="text-sm font-medium text-gray-400">{t('thumbnailsTitle')}</h3>
         <div className="flex items-center gap-2">
             <button
-                onClick={onOpenLayoutEditor}
+                onClick={onOpenWatermarkGenerator}
                 className="flex items-center gap-1.5 text-sm bg-blue-600/80 text-white font-semibold py-1 px-3 rounded-lg hover:bg-blue-700 transition-colors"
-                aria-label={t('layoutEditorButton')}
-                title={t('layoutEditorButton')}
+                aria-label={t('watermarkGeneratorButton')}
+                title={t('watermarkGeneratorButton')}
             >
-                <LayoutIcon className="w-4 h-4" />
-                <span className="hidden sm:inline">{t('layoutEditorButton')}</span>
+                <StampIcon className="w-4 h-4" />
+                <span className="hidden sm:inline">{t('watermarkGeneratorButton')}</span>
             </button>
             <button
             onClick={onAddImage}
