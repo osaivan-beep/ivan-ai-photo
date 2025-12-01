@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { GenerateContentResponse } from '@google/genai';
 import { CanvasEditor, type CanvasEditorRef } from './components/CanvasEditor';
@@ -6,17 +5,19 @@ import { QuickPrompts } from './components/QuickPrompts';
 import { Toolbar } from './components/Toolbar';
 import { ThumbnailManager } from './components/ThumbnailManager';
 import { ResultDisplay } from './components/ResultDisplay';
-import { UploadIcon, SparklesIcon, RedrawIcon, ZoomInIcon, ZoomOutIcon, ArrowsPointingOutIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, UserCircleIcon, ShareIcon, CloseIcon, HandIcon, KeyIcon } from './components/Icons';
+import { UploadIcon, SparklesIcon, RedrawIcon, ZoomInIcon, ZoomOutIcon, ArrowsPointingOutIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, UserCircleIcon, ShareIcon, CloseIcon, HandIcon, KeyIcon, VideoCameraIcon } from './components/Icons';
 import { editImageWithGemini, generateImageWithGemini, refinePrompt } from './services/geminiService';
 import type { ApiResult, Language, UploadedImage, GeminiImagePart, TFunction, ImageResolution, UserProfile, FirebaseConfig } from './types';
 import { translations } from './lib/translations';
-import { LayoutEditor } from './components/LayoutEditor';
 import { PhotoEditor } from './components/PhotoEditor';
+import { LayoutEditor } from './components/LayoutEditor';
 import { initializeFirebase, isFirebaseConfigured, login, register, logout, getUserProfile, deductCredits, addCreditsByEmail, getAuthInstance, sendPasswordReset } from './services/firebaseService';
 import { onAuthStateChanged } from 'firebase/auth';
 import { AdminUserList } from './components/AdminUserList';
 import { embeddedConfig } from './lib/firebaseConfig';
 import { ApiKeyWelcomeModal } from './components/ApiKeyWelcomeModal';
+import { WatermarkModal } from './components/WatermarkModal';
+import { VideoPromptModal } from './components/VideoPromptModal';
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -27,7 +28,6 @@ interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
 }
 
-// ZoomControls Component
 const ZoomControls = ({ zoom, onZoomChange, onFit, t, isPanMode, onTogglePan }: { zoom: number, onZoomChange: (z: number) => void, onFit: () => void, t: TFunction, isPanMode: boolean, onTogglePan: () => void }) => (
     <div className="flex items-center gap-1 bg-gray-700/50 rounded-lg p-1 px-2 border border-gray-600 h-9">
          <button 
@@ -97,6 +97,7 @@ const LandingScreen: React.FC<{ onConfigSave: (config: FirebaseConfig) => void; 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [systemConfigured, setSystemConfigured] = useState(false);
+    const [showForgotPassword, setShowForgotPassword] = useState(false);
 
     useEffect(() => {
         setSystemConfigured(isFirebaseConfigured());
@@ -233,7 +234,6 @@ const LandingScreen: React.FC<{ onConfigSave: (config: FirebaseConfig) => void; 
         setLoading(true);
         setError(null);
         try {
-            // Strict Login Only
             await login(email.trim(), password);
             onAuthSuccess();
         } catch (err: any) {
@@ -248,8 +248,10 @@ const LandingScreen: React.FC<{ onConfigSave: (config: FirebaseConfig) => void; 
                 setError('此 Email 已被註冊。');
             } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
                 setError('帳號或密碼錯誤。');
+            } else if (err.code === 'auth/weak-password') {
+                setError('密碼強度不足 (需 6 位以上)。');
             } else if (err.code === 'auth/user-not-found') {
-                setError('找不到此帳號。請聯絡管理員開通權限。');
+                setError('找不到此帳號。請聯絡管理員開通。');
             } else {
                 setError(errorMessage);
             }
@@ -415,6 +417,7 @@ const getClosestAspectRatio = (width: number, height: number): '1:1' | '16:9' | 
         { r: 4/3, val: '4:3' as const },
         { r: 3/4, val: '3:4' as const }
     ];
+    // Find closest
     return targets.reduce((prev, curr) => 
         Math.abs(curr.r - ratio) < Math.abs(prev.r - ratio) ? curr : prev
     ).val;
@@ -428,7 +431,9 @@ const App: React.FC = () => {
   const [firebaseInitialized, setFirebaseInitialized] = useState(false);
   const [isCustomKey, setIsCustomKey] = useState(false);
   const [showKeyModal, setShowKeyModal] = useState(false);
-  
+  const [showWatermarkModal, setShowWatermarkModal] = useState(false);
+  const [showVideoPromptModal, setShowVideoPromptModal] = useState(false);
+
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [brushSize, setBrushSize] = useState<number>(10);
@@ -451,6 +456,7 @@ const App: React.FC = () => {
   const [isLayoutEditorOpen, setIsLayoutEditorOpen] = useState(false);
   const [editingImage, setEditingImage] = useState<UploadedImage | null>(null);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+  const [adminMsg, setAdminMsg] = useState('');
   const [showPermissionHelp, setShowPermissionHelp] = useState(false);
 
   const canvasRef = useRef<CanvasEditorRef>(null);
@@ -474,7 +480,6 @@ const App: React.FC = () => {
     setTimeout(() => {
         const container = imageContainerRef.current;
         if (!container) return;
-        
         const img = new Image();
         img.src = selectedImage.dataUrl;
         img.onload = () => {
@@ -482,35 +487,17 @@ const App: React.FC = () => {
              const w = container.clientWidth;
              const h = container.clientHeight;
              if (w === 0 || h === 0) return;
-             
              const scaleX = (w - padding) / img.naturalWidth;
              const scaleY = (h - padding) / img.naturalHeight;
-             const scale = Math.min(scaleX, scaleY);
-             
-             setZoom(scale); 
+             setZoom(Math.min(scaleX, scaleY)); 
              setPan({ x: 0, y: 0 });
         };
     }, 50);
   }, [selectedImage]);
 
-  useEffect(() => {
-      if (selectedImageId) {
-          fitImageToScreen();
-      }
-  }, [selectedImageId, fitImageToScreen]);
-  
-  useEffect(() => {
-      const handleResize = () => fitImageToScreen();
-      window.addEventListener('resize', handleResize);
-      return () => window.removeEventListener('resize', handleResize);
-  }, [fitImageToScreen]);
-
-  useEffect(() => {
-      if (selectedImageId && !loading && !apiResult.imageUrl) {
-          fitImageToScreen();
-      }
-  }, [selectedImageId, loading, apiResult.imageUrl, fitImageToScreen]);
-
+  useEffect(() => { if (selectedImageId) fitImageToScreen(); }, [selectedImageId, fitImageToScreen]);
+  useEffect(() => { const handleResize = () => fitImageToScreen(); window.addEventListener('resize', handleResize); return () => window.removeEventListener('resize', handleResize); }, [fitImageToScreen]);
+  useEffect(() => { if (selectedImageId && !loading && !apiResult.imageUrl) fitImageToScreen(); }, [selectedImageId, loading, apiResult.imageUrl, fitImageToScreen]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -524,26 +511,15 @@ const App: React.FC = () => {
                 window.location.reload();
                 return;
             }
-        } catch (e) {
-            console.error('Invalid setup string');
-        }
+        } catch (e) {}
     }
-
-    if (isFirebaseConfigured()) {
-        try {
-            initializeFirebase();
-            setFirebaseInitialized(true);
-        } catch (e) {
-            console.error("Failed to initialize firebase", e);
-        }
-    }
+    if (isFirebaseConfigured()) { try { initializeFirebase(); setFirebaseInitialized(true); } catch (e) { console.error(e); } }
   }, []);
 
   useEffect(() => {
     if (!firebaseInitialized) return;
     const auth = getAuthInstance();
     if (!auth) return;
-
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
         if (user) {
             try {
@@ -551,10 +527,7 @@ const App: React.FC = () => {
                 setUserProfile(profile);
                 setAppState('app');
             } catch (e: any) {
-                console.error("Failed to get profile:", e);
-                if (e.code === 'permission-denied' || e.message?.includes('Missing or insufficient permissions')) {
-                     setShowPermissionHelp(true);
-                }
+                if (e.code === 'permission-denied') setShowPermissionHelp(true);
             }
         } else {
             setUserProfile(null);
@@ -570,61 +543,23 @@ const App: React.FC = () => {
       else setShowKeyModal(true);
   }, []);
 
-  useEffect(() => {
-      const checkKey = async () => {
-          if (process.env.API_KEY && process.env.API_KEY.length > 0) {
-              setHasKey(true);
-              return;
-          }
-          setHasKey(true);
-      };
-      checkKey();
-  }, []);
+  useEffect(() => { setHasKey(true); }, []);
 
-  const handleConnectApiKey = async () => {
-      if (window.aistudio && window.aistudio.openSelectKey) {
-          await window.aistudio.openSelectKey();
-          setHasKey(true); 
-      }
-  };
-  
-  const handleConfigSave = (config: FirebaseConfig) => {
-      try {
-          initializeFirebase(config);
-          setFirebaseInitialized(true);
-      } catch (e: any) {
-          alert(e.message);
-      }
-  };
-  
-  const refreshUserProfile = async () => {
-      if (userProfile) {
-          try {
-              const updated = await getUserProfile(userProfile.uid);
-              setUserProfile(updated);
-          } catch(e) { console.error("Refresh failed", e); }
-      }
-  };
+  const handleConfigSave = (config: FirebaseConfig) => { try { initializeFirebase(config); setFirebaseInitialized(true); } catch (e: any) { alert(e.message); } };
+  const refreshUserProfile = async () => { if (userProfile) { try { const updated = await getUserProfile(userProfile.uid); setUserProfile(updated); } catch(e) {} } };
 
   const handleRefinePrompt = async () => {
     if (!prompt) return;
-    if (!userProfile || userProfile.credits < 1) {
-        alert(t('notEnoughCredits'));
-        return;
-    }
+    if (!userProfile || userProfile.credits < 1) { alert(t('notEnoughCredits')); return; }
 
     setIsRefining(true);
-    
     let imagePart: GeminiImagePart | null = null;
     if (selectedImage) {
         try {
             const dataUrl = canvasRef.current ? canvasRef.current.toDataURL() : selectedImage.dataUrl;
             const [header, base64Data] = dataUrl.split(',');
-            const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
-            imagePart = { base64Data, mimeType };
-        } catch (e) {
-            console.error("Error preparing image for refine prompt:", e);
-        }
+            imagePart = { base64Data, mimeType: header.match(/:(.*?);/)?.[1] || 'image/png' };
+        } catch (e) {}
     }
 
     try {
@@ -635,17 +570,8 @@ const App: React.FC = () => {
             setPrompt(enhancedPrompt);
         }
     } catch (e: any) {
-        console.error("Refine prompt failed", e);
-        if (e.code === 'permission-denied' || e.message?.includes('Missing or insufficient permissions')) {
-            setShowPermissionHelp(true);
-        }
-    } finally {
-        setIsRefining(false);
-    }
-  };
-
-  const getCostForResolution = (res: ImageResolution) => {
-      return 3;
+         if (e.code === 'permission-denied') setShowPermissionHelp(true);
+    } finally { setIsRefining(false); }
   };
 
   const handleDeductCredits = async (amount: number) => {
@@ -653,9 +579,7 @@ const App: React.FC = () => {
           try {
             await deductCredits(userProfile.uid, amount);
             setUserProfile(prev => prev ? { ...prev, credits: prev.credits - amount } : null);
-          } catch(e) {
-              console.error("Failed to deduct credits in child component", e);
-          }
+          } catch(e) {}
       }
   }
 
@@ -670,24 +594,26 @@ const App: React.FC = () => {
       setShowKeyModal(true);
   };
 
+  const handleConnectApiKey = () => {
+    setHasKey(true);
+  };
+  
+  const handleAddWatermarkImage = (dataUrl: string) => {
+      const newImage: UploadedImage = { id: `watermark-${Date.now()}`, file: new File([], "watermark.png"), dataUrl };
+      setUploadedImages(prev => [...prev, newImage]);
+      setSelectedImageId(newImage.id);
+      setShowWatermarkModal(false);
+  };
+
   const handleGenerate = useCallback(async () => {
     const cost = 3;
-    if (!prompt) {
-      setError('Please enter a prompt.');
-      return;
-    }
-    if (!userProfile || userProfile.credits < cost) {
-        setError(t('notEnoughCredits'));
-        return;
-    }
+    if (!prompt) { setError('Please enter a prompt.'); return; }
+    if (!userProfile || userProfile.credits < cost) { setError(t('notEnoughCredits')); return; }
 
     let capturedCanvasData: string | null = null;
     if (selectedImage && !apiResult.imageUrl) {
-        if (canvasRef.current) {
-             capturedCanvasData = canvasRef.current.toDataURL('image/png');
-        } else {
-             capturedCanvasData = selectedImage.dataUrl;
-        }
+        if (canvasRef.current) { capturedCanvasData = canvasRef.current.toDataURL('image/png'); } 
+        else { capturedCanvasData = selectedImage.dataUrl; }
     }
 
     const previousResultUrl = apiResult.imageUrl;
@@ -706,12 +632,10 @@ const App: React.FC = () => {
       }
 
       let resultImageUrl = '';
-      let resultText = '';
 
       if (!selectedImage) {
         const result = await generateImageWithGemini(prompt, effectiveAspectRatio);
         resultImageUrl = result.imageUrl;
-        
         if (resultImageUrl) {
             await deductCredits(userProfile.uid, cost);
             setUserProfile(prev => prev ? { ...prev, credits: prev.credits - cost } : null);
@@ -721,8 +645,7 @@ const App: React.FC = () => {
         let baseImagePart: GeminiImagePart;
         if (previousResultUrl) {
             const [header, base64Data] = previousResultUrl.split(',');
-            const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
-            baseImagePart = { base64Data, mimeType };
+            baseImagePart = { base64Data, mimeType: header.match(/:(.*?);/)?.[1] || 'image/png' };
         } else {
             if (!capturedCanvasData) throw new Error('Canvas data missing.');
             const base64Data = capturedCanvasData.split(',')[1];
@@ -731,79 +654,39 @@ const App: React.FC = () => {
         
         const imagesToSend: GeminiImagePart[] = [baseImagePart];
         
-        const imageReferenceKeyword = t('imageReference');
-        const regex = new RegExp(`${imageReferenceKeyword}(\\d+)`, 'g');
-        let match;
-        while ((match = regex.exec(prompt)) !== null) {
-          const imageNumber = parseInt(match[1], 10);
-          if (imageNumber > 0 && imageNumber <= uploadedImages.length) {
-          }
-        }
-        
         const editPrefix = "Edit instruction: ";
         const finalPrompt = `${editPrefix}${prompt}\n\n${t('instructionalPrompt')}`;
         
-        const result = await editImageWithGemini(
-          imagesToSend,
-          finalPrompt
-        );
-        
+        const result = await editImageWithGemini(imagesToSend, finalPrompt);
         const response = result.response;
 
-        if (response.candidates && response.candidates[0] && response.candidates[0].content && response.candidates[0].content.parts) {
-          for (const part of response.candidates[0].content.parts) {
-            if (part.text) {
-              resultText += part.text + '\n';
-            } else if (part.inlineData) {
-              resultImageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-            }
+        if (response.candidates && response.candidates[0]?.content?.parts) {
+          const part = response.candidates[0].content.parts.find(p => p.inlineData);
+          if (part?.inlineData) {
+            resultImageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
           }
         } else {
           throw new Error('Invalid response structure from API.');
         }
 
-        if (resultImageUrl || resultText) {
-             let contentChanged = true;
-
-             if (selectedImage && resultImageUrl) {
-                  const sourceDataUrl = previousResultUrl || capturedCanvasData || selectedImage.dataUrl;
-                  if (sourceDataUrl === resultImageUrl) {
-                      contentChanged = false;
-                  }
-             }
-
-             if (contentChanged) {
-                 const finalCost = cost;
-                 await deductCredits(userProfile.uid, finalCost);
-                 setUserProfile(prev => prev ? { ...prev, credits: prev.credits - finalCost } : null);
-             }
-             setApiResult({ text: resultText.trim(), imageUrl: resultImageUrl });
+        if (resultImageUrl) {
+             await deductCredits(userProfile.uid, cost);
+             setUserProfile(prev => prev ? { ...prev, credits: prev.credits - cost } : null);
+             setApiResult({ text: null, imageUrl: resultImageUrl });
         }
       }
     } catch (e: any) {
       console.error(e);
-      if (e.code === 'permission-denied' || e.message?.includes('Missing or insufficient permissions')) {
-          setShowPermissionHelp(true);
-          setLoading(false);
-          setApiResult({ text: null, imageUrl: previousResultUrl });
-          return;
-      }
-
-      const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred.';
-      if (errorMessage === 'RATE_LIMIT_EXCEEDED') {
-        setError(t('rateLimitError'));
-      } else if (errorMessage === 'PERMISSION_DENIED' || errorMessage.includes('403') || errorMessage.includes('PERMISSION_DENIED')) {
-        setError('PERMISSION_DENIED_UI');
-      } else {
-        setError(errorMessage);
-      }
+      const msg = e.message || '';
+      if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) setError('API Permission Denied. Please check your custom API key.');
+      else if (msg.includes('RESOURCE_EXHAUSTED')) setError(t('rateLimitError'));
+      else setError(msg);
       setApiResult({ text: null, imageUrl: previousResultUrl });
     } finally {
       setLoading(false);
     }
   }, [selectedImage, prompt, uploadedImages, selectedImageId, t, apiResult.imageUrl, aspectRatio, userProfile]);
 
-  // Image & Canvas Handlers
   const handleFiles = useCallback((files: FileList) => {
     const filesArray = Array.from(files).filter(file => file.type.startsWith('image/'));
     if (filesArray.length === 0) return;
@@ -852,7 +735,6 @@ const App: React.FC = () => {
   const resetView = useCallback(() => { fitImageToScreen(); }, [fitImageToScreen]);
   const onMouseDown = (e: React.MouseEvent) => { if (e.button !== 0) return; e.preventDefault(); handlePanStart(e.clientX, e.clientY); };
   const onMouseMove = (e: React.MouseEvent) => { e.preventDefault(); handlePanMove(e.clientX, e.clientY); };
-  
   const onTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       setIsPanning(false);
@@ -920,7 +802,18 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 font-sans relative">
       {showKeyModal && <ApiKeyWelcomeModal onSave={handleSaveApiKey} t={t} />}
+      {showWatermarkModal && (
+        <WatermarkModal 
+            onClose={() => setShowWatermarkModal(false)} 
+            onUseImage={handleAddWatermarkImage} 
+            t={t} 
+            userCredits={userProfile?.credits || 0}
+            onDeductCredits={handleDeductCredits}
+        />
+      )}
+      {showVideoPromptModal && selectedImage && <VideoPromptModal imageSrc={selectedImage.dataUrl} onClose={() => setShowVideoPromptModal(false)} t={t} lang={lang} />}
       {showPermissionHelp && <PermissionErrorModal onClose={() => setShowPermissionHelp(false)} />}
+      {/* LayoutEditor kept for backward compat but button hidden, can be removed if cleanup desired */}
       {isLayoutEditorOpen && <LayoutEditor onComplete={handleLayoutComplete} onClose={() => setIsLayoutEditorOpen(false)} t={t} />}
       {editingImage && (
         <PhotoEditor 
@@ -939,8 +832,8 @@ const App: React.FC = () => {
                 <h1 className="text-4xl lg:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">
                     {t('title')} 
                     <span className="text-xs bg-gray-800 text-gray-400 px-2 py-1 rounded border border-gray-600 align-middle ml-2">
-                        v2025.11.30 Release
-                        {isCustomKey ? <span className="text-green-400 ml-1">● Custom Key</span> : <span className="text-yellow-500 ml-1">● Default Key</span>}
+                        Gemini 2.5 (v2025.12.01)
+                        {isCustomKey ? <span className="text-green-400 ml-1">● Custom Key</span> : <span className="text-yellow-500 ml-1">● Default</span>}
                     </span>
                 </h1>
                 <p className="text-gray-400 mt-2">{t('subtitle')}</p>
@@ -970,6 +863,7 @@ const App: React.FC = () => {
             </div>
         </header>
 
+        {/* Admin Panel */}
         {userProfile?.isAdmin && (
             <div className="mb-6 bg-blue-900/20 border border-blue-500/30 p-4 rounded-lg">
                 <div className="flex justify-between items-center cursor-pointer" onClick={() => setIsAdminPanelOpen(!isAdminPanelOpen)}>
@@ -985,6 +879,7 @@ const App: React.FC = () => {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left Column */}
           <div className="flex flex-col gap-4 bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700">
              <div className="flex flex-wrap justify-between items-center gap-2">
               <div className="flex items-center gap-4">
@@ -1020,6 +915,7 @@ const App: React.FC = () => {
                     originalImageSrc={selectedImage?.dataUrl || null}
                  />
             ) : (
+                // Canvas View
                  <div className={`relative w-full aspect-[4/3] bg-gray-900 rounded-lg overflow-hidden border-2 border-dashed border-gray-700 group ${isPanMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}>
                     <div 
                         ref={imageContainerRef}
@@ -1031,6 +927,7 @@ const App: React.FC = () => {
                         onTouchStart={onTouchStart}
                         onTouchMove={onTouchMove}
                         onTouchEnd={onTouchEnd}
+                        // Removed onWheel to prevent zooming via mouse wheel
                     >
                     {!selectedImage ? (
                         <div className="flex flex-col items-center text-gray-500 cursor-pointer hover:text-gray-400 transition-colors" onClick={handleUploadClick}>
@@ -1061,6 +958,7 @@ const App: React.FC = () => {
                 </div>
             )}
 
+            {/* Toolbar for Canvas */}
             {!apiResult.imageUrl && (
                 <Toolbar
                     brushSize={brushSize}
@@ -1072,6 +970,7 @@ const App: React.FC = () => {
                 />
             )}
             
+            {/* Thumbnails */}
             <ThumbnailManager
                 images={uploadedImages}
                 selectedImageId={selectedImageId}
@@ -1080,11 +979,12 @@ const App: React.FC = () => {
                 onAddImage={handleUploadClick}
                 onReorder={handleImageReorder}
                 onEdit={handleOpenPhotoEditor}
-                onOpenLayoutEditor={() => setIsLayoutEditorOpen(true)}
+                onOpenWatermarkGenerator={() => setShowWatermarkModal(true)}
                 t={t}
             />
           </div>
 
+          {/* Right Column */}
           <div className="flex flex-col gap-6">
             <div className="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700 flex flex-col gap-4">
                  <div className="flex justify-between items-center">
@@ -1095,6 +995,15 @@ const App: React.FC = () => {
                         </span>
                     </label>
                     <div className="flex gap-2">
+                        {selectedImage && (
+                            <button
+                                onClick={() => setShowVideoPromptModal(true)}
+                                className="text-xs bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-500/30 px-3 py-1.5 rounded-full transition-all flex items-center gap-1"
+                                title={t('videoPromptButton')}
+                            >
+                                <VideoCameraIcon className="w-4 h-4"/> {t('videoPromptButton')}
+                            </button>
+                        )}
                         <button
                             onClick={handleRefinePrompt}
                             disabled={!prompt || isRefining}
