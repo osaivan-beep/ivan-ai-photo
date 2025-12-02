@@ -3,20 +3,18 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
-  // Load env file based on `mode` in the current working directory.
-  const env = loadEnv(mode, (process as any).cwd(), '');
-  
-  // FORCE INJECT the Gemini API Key.
-  // Priority: 
-  // 1. System Environment Variable (process.env.API_KEY) - This is what Vercel/GitHub Actions uses.
-  // 2. .env file loaded by loadEnv (env.API_KEY) - This is for local development.
-  const apiKey = process.env.API_KEY || env.API_KEY || "";
-
+  const env = loadEnv(mode, '.', '');
   return {
     plugins: [react()],
-    base: './', // Changed from specific repo name to relative path for universal compatibility (Vercel & GitHub)
+    base: '/ivan-ai-photo/', // GitHub Pages repository name or '/' if hosted on root domain
     define: {
-      'process.env.API_KEY': JSON.stringify(apiKey)
+      // -----------------------------------------------------------------------
+      // 配置說明 / CONFIGURATION NOTE:
+      // 請將下方的 "AIza..." 替換為您真實的 Google Gemini API Key。
+      // 這樣您的朋友登入後就可以直接使用，無需再輸入 Key。
+      // Replace the string below with your REAL Gemini API Key.
+      // -----------------------------------------------------------------------
+      'process.env.API_KEY': JSON.stringify("AIzaSyCeR52YbrlvyOqk8-cOyTwEVZ9TYRrbdCg") 
     },
     build: {
       outDir: 'dist',

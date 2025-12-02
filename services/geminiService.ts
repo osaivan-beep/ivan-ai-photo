@@ -1,111 +1,27 @@
-
 import { GoogleGenAI, Modality, type GenerateContentResponse } from '@google/genai';
 import type { GeminiImagePart, ImageResolution } from '../types';
 
-// Check if a system-level key exists (from build env)
-export const hasSystemKey = (): boolean => {
-    return !!process.env.API_KEY && process.env.API_KEY.length > 10;
-};
-
-// Dynamic retrieval function
+// Dynamic retrieval function - Modified for Hosted Mode
+// It now directly uses the key injected by vite.config.ts
 const getActiveKey = (): string => {
-    try {
-        const custom = localStorage.getItem('custom_gemini_api_key');
-        if (custom && custom.trim().length > 10) {
-            return custom.trim();
-        }
-    } catch (e) {
-        console.warn("Failed to access localStorage", e);
-    }
-    // Return the injected key from build process (GitHub Secret or Fallback)
-    const envKey = process.env.API_KEY;
-    if (!envKey) {
-        console.warn("API Key is missing in environment variables!");
-    }
-    return envKey || "";
+    // Return the key defined in vite.config.ts
+    // This allows friends to use the app without entering a key.
+    return process.env.API_KEY || "";
 };
 
-// Helper to show the user which key is active (security safe)
-export const getActiveKeyMasked = (): string => {
-    const key = getActiveKey();
-    if (!key) return "No Key";
-    if (key.length <= 4) return "****";
-    return `...${key.slice(-4)}`;
-};
-
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-const handleGeminiError = async (error: unknown, context: string, attempt: number, maxRetries: number): Promise<void> => {
-  console.error(`Error calling ${context} (Attempt ${attempt}/${maxRetries}):`, error);
-  
+const handleGeminiError = (error: unknown, context: string): never => {
+  console.error(`Error calling ${context}:`, error);
   if (error instanceof Error) {
     const msg = error.message;
-    
-    // Handle Rate Limits (429 / RESOURCE_EXHAUSTED)
     if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')) {
-        if (attempt < maxRetries) {
-            console.warn(`Rate limit hit. Retrying in ${2 * attempt} seconds...`);
-            await delay(2000 * attempt); // Exponential backoff: 2s, 4s, 6s...
-            return; // Return to retry loop
-        }
-        if (context.includes("Image")) {
-            throw new Error('RATE_LIMIT_EXCEEDED: 生圖配額已滿 (Image Quota Full)。請更換 Key 或等待。');
-        }
-        throw new Error('RATE_LIMIT_EXCEEDED: API 配額已滿 (Quota Full)。請稍後再試。');
+      throw new Error('額度已滿，請稍後再試 (Rate Limit Exceeded)');
     }
-
-    // Handle Permissions (403 / PERMISSION_DENIED)
     if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) {
-        let hint = "";
-        const isFirebaseKey = getActiveKey().startsWith("AIzaSyC0");
-        
-        if (isFirebaseKey) {
-             hint = "\n[警告] 您似乎使用了 Firebase Browser Key (AIzaSyC0...)。Gemini 生圖通常需要獨立的 Gemini API Key。";
-        } else if (msg.includes("BILLING_DISABLED") || context.includes("Image")) {
-            hint = "\n[常見原因]：\n1. 專案未連結帳單 (Billing Account)。\n2. **API 限制**：請檢查 GCP Console > Credentials > API Key > API restrictions，確保已勾選 'Generative Language API'。\n3. **網址限制**：請檢查 Application restrictions，確保已加入您的 Vercel 網址 (https://....vercel.app)。";
-        } else {
-            hint = "\n原因是：Key 不正確、專案未連結帳單、或網域限制(Referrer)阻擋了請求。";
-        }
-
-        throw new Error(`PERMISSION_DENIED (403): 權限被拒。${hint}
-
-【解決方法】
-1. 請點擊下方的 **「🔑 更新/輸入 API Key」** 按鈕。
-2. 如果您是用付費 Key，請確保 GCP 專案已連結信用卡。
-3. 檢查 GCP Console 金鑰設定底部的 **「API restrictions」** 分頁。
-4. **重要：** 若在 Vercel 部署，請確保 GCP 的 Application restrictions 已加入新的 vercel.app 網址。
-
-目前使用的 Key 結尾是：${getActiveKeyMasked()}`);
+      throw new Error('權限不足，請檢查 API Key 設定 (Permission Denied)');
     }
-
     throw new Error(`${context} Error: ${msg}`);
   }
   throw new Error(`An unknown error occurred while communicating with the ${context}.`);
-};
-
-// NEW: Function to validate key connectivity explicitly
-export const validateGeminiKey = async (apiKey: string): Promise<{ valid: boolean; message: string }> => {
-    if (!apiKey || apiKey.length < 10) return { valid: false, message: "Key 格式無效 (太短)" };
-    
-    try {
-        const ai = new GoogleGenAI({ apiKey });
-        // Use flash model for cheap/fast check of basic connectivity
-        await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: { parts: [{ text: "Hello" }] },
-        });
-        return { valid: true, message: "連線成功！API Key 有效 (文字模型)。\n注意：若生圖仍失敗，通常是 GCP 專案的 Billing 未啟用，或 API 限制 (API Restrictions) 未包含 Generative Language API。" };
-    } catch (error: any) {
-        console.error("Key Validation Error:", error);
-        let msg = error.message || "未知錯誤";
-        
-        if (msg.includes("API_KEY_INVALID")) msg = "無效的 API Key (API_KEY_INVALID)。請重新複製。";
-        else if (msg.includes("PERMISSION_DENIED")) msg = "權限被拒 (403)。\n請檢查：\n1. 網域限制 (Application restrictions) 是否包含目前網址。\n2. **API 限制 (API restrictions)** 是否包含 Generative Language API。";
-        else if (msg.includes("BILLING_DISABLED")) msg = "專案未啟用計費 (Billing)。";
-        else if (msg.includes("RESOURCE_EXHAUSTED")) msg = "配額已滿 (429)。";
-        
-        return { valid: false, message: `驗證失敗: ${msg}` };
-    }
 };
 
 export const generateImageWithGemini = async (
@@ -114,42 +30,42 @@ export const generateImageWithGemini = async (
 ): Promise<{ imageUrl: string }> => {
   
   const apiKey = getActiveKey();
-  if (!apiKey) throw new Error("API Key is missing. Please set a custom key.");
-  
   const ai = new GoogleGenAI({ apiKey });
-  const maxRetries = 3;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        const config: any = {};
-        if (aspectRatio) {
-            config.imageConfig = { aspectRatio: aspectRatio };
-        }
-
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
-          contents: { parts: [{ text: prompt }] },
-          config: config,
-        });
-
-        let resultImageUrl = '';
-        if (response.candidates && response.candidates[0]?.content?.parts) {
-            for (const part of response.candidates[0].content.parts) {
-                if (part.inlineData) {
-                    resultImageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                    break; 
-                }
-            }
-        }
-
-        if (!resultImageUrl) throw new Error('No image generated.');
-        return { imageUrl: resultImageUrl };
-
-      } catch (error: any) {
-         await handleGeminiError(error, "Gemini 2.5 Image API", attempt, maxRetries);
+  
+  const extractImage = (response: any) => {
+      let resultImageUrl = '';
+      if (response.candidates && response.candidates[0] && response.candidates[0].content && response.candidates[0].content.parts) {
+          for (const part of response.candidates[0].content.parts) {
+              if (part.inlineData) {
+                  resultImageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                  break; 
+              }
+          }
       }
+      return resultImageUrl;
+  };
+
+  try {
+    // Using Gemini 2.5 Flash Image
+    const config: any = {};
+    // Only pass aspect ratio if strictly provided (Text-to-Image)
+    if (aspectRatio) {
+        config.imageConfig = { aspectRatio: aspectRatio };
+    }
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: { parts: [{ text: prompt }] },
+      config: config,
+    });
+
+    const img = extractImage(response);
+    if (!img) throw new Error('No image generated.');
+    return { imageUrl: img };
+
+  } catch (error: any) {
+     handleGeminiError(error, "Gemini 2.5 Image API");
   }
-  throw new Error("Failed to generate image after retries.");
 };
 
 export const editImageWithGemini = async (
@@ -157,9 +73,7 @@ export const editImageWithGemini = async (
   prompt: string
 ): Promise<{ response: GenerateContentResponse }> => {
   const apiKey = getActiveKey();
-  if (!apiKey) throw new Error("API Key is missing. Please set a custom key.");
   const ai = new GoogleGenAI({ apiKey });
-  const maxRetries = 3;
 
   const imageParts = images.map(image => ({
       inlineData: { data: image.base64Data, mimeType: image.mimeType },
@@ -167,19 +81,16 @@ export const editImageWithGemini = async (
   const textPart = { text: prompt };
   const allParts = [...imageParts, textPart];
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image', 
-          contents: { parts: allParts },
-        });
-        return { response };
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image', 
+      contents: { parts: allParts },
+    });
+    return { response };
 
-      } catch (error: any) {
-          await handleGeminiError(error, "Gemini 2.5 Image API", attempt, maxRetries);
-      }
+  } catch (error: any) {
+      handleGeminiError(error, "Gemini 2.5 API");
   }
-  throw new Error("Failed to edit image after retries.");
 };
 
 export const refinePrompt = async (
@@ -188,8 +99,6 @@ export const refinePrompt = async (
     language: string = 'en'
 ): Promise<string> => {
   const apiKey = getActiveKey();
-  if (!apiKey) return prompt; 
-  
   const ai = new GoogleGenAI({ apiKey });
   try {
     let systemInstruction = "";
@@ -224,11 +133,22 @@ export const refinePrompt = async (
   }
 };
 
+export interface WatermarkParams {
+    text: string;
+    subText?: string;
+    style: string;
+    theme?: string;
+    icon?: string;
+    color?: string;
+}
+
+export const generateWatermark = async (params: WatermarkParams): Promise<string> => {
+    return ""; 
+};
+
 // NEW: Video Prompt Generation
 export const generateVideoPrompt = async (image: GeminiImagePart, language: string = 'en'): Promise<string> => {
     const apiKey = getActiveKey();
-    if (!apiKey) return "Error: No API Key";
-
     const ai = new GoogleGenAI({ apiKey });
 
     const systemInstruction = language === 'zh' 
@@ -265,7 +185,6 @@ export const generatePoeticText = async (
     imagePart?: GeminiImagePart
 ): Promise<string> => {
     const apiKey = getActiveKey();
-    if (!apiKey) throw new Error("No API Key");
     const ai = new GoogleGenAI({ apiKey });
 
     // Determine specific language instructions
@@ -281,8 +200,6 @@ export const generatePoeticText = async (
         Line 3: Poem line 2
         Line 4: Poem line 3
         Line 5: Poem line 4
-        
-        Strictly follow the 5-line structure.
         `;
     } else if (languageLabel.includes("中英文")) {
         languageInstruction = "Use Traditional Chinese AND English translation.";
@@ -308,9 +225,8 @@ export const generatePoeticText = async (
     Strict Instructions:
     1. ${languageInstruction}
     2. ${formatInstruction}
-    3. Output ONLY the raw text lines. NO "Title:" labels, NO markdown code blocks, NO "Here is a poem".
+    3. Output ONLY the raw text lines. No "Title:" labels, no markdown code blocks (like \`\`\`). DO NOT add "Here is the poem:"
     4. Be creative, visual, and capture the mood of the image.
-    5. Do NOT output the text "伊凡水墨". Write a new, original poem based on the image.
     `;
 
     const parts: any[] = [];
@@ -339,7 +255,7 @@ export const generatePoeticText = async (
         });
         
         let result = response.text?.trim();
-        if (!result) throw new Error("Empty response from AI");
+        if (!result) return "AI 未能生成內容，請重試。\n(AI failed to generate content)";
         
         // Clean up markdown
         result = result.replace(/^```[a-z]*\n/i, '').replace(/```$/, '').trim();
@@ -350,6 +266,6 @@ export const generatePoeticText = async (
 
     } catch (error) {
         console.error("Poetic generation failed:", error);
-        throw error; // Rethrow to let UI handle it
+        return "生成錯誤，請檢查網路 (Generation Error)"; 
     }
 };

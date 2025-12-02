@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { GenerateContentResponse } from '@google/genai';
 import { CanvasEditor, type CanvasEditorRef } from './components/CanvasEditor';
@@ -6,8 +5,8 @@ import { QuickPrompts } from './components/QuickPrompts';
 import { Toolbar } from './components/Toolbar';
 import { ThumbnailManager } from './components/ThumbnailManager';
 import { ResultDisplay } from './components/ResultDisplay';
-import { UploadIcon, SparklesIcon, RedrawIcon, ZoomInIcon, ZoomOutIcon, ArrowsPointingOutIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, UserCircleIcon, ShareIcon, CloseIcon, HandIcon, KeyIcon, VideoCameraIcon } from './components/Icons';
-import { editImageWithGemini, generateImageWithGemini, refinePrompt, getActiveKeyMasked, hasSystemKey } from './services/geminiService';
+import { UploadIcon, SparklesIcon, RedrawIcon, ZoomInIcon, ZoomOutIcon, ArrowsPointingOutIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, UserCircleIcon, ShareIcon, CloseIcon, HandIcon, VideoCameraIcon } from './components/Icons';
+import { editImageWithGemini, generateImageWithGemini, refinePrompt } from './services/geminiService';
 import type { ApiResult, Language, UploadedImage, GeminiImagePart, TFunction, ImageResolution, UserProfile, FirebaseConfig } from './types';
 import { translations } from './lib/translations';
 import { PhotoEditor } from './components/PhotoEditor';
@@ -16,7 +15,6 @@ import { initializeFirebase, isFirebaseConfigured, login, register, logout, getU
 import { onAuthStateChanged } from 'firebase/auth';
 import { AdminUserList } from './components/AdminUserList';
 import { embeddedConfig } from './lib/firebaseConfig';
-import { ApiKeyWelcomeModal } from './components/ApiKeyWelcomeModal';
 import { WatermarkModal } from './components/WatermarkModal';
 import { VideoPromptModal } from './components/VideoPromptModal';
 
@@ -60,30 +58,6 @@ const ZoomControls = ({ zoom, onZoomChange, onFit, t, isPanMode, onTogglePan }: 
         <button onClick={onFit} className="p-1.5 hover:bg-gray-600 rounded text-gray-300" title={t('resetViewButton')}>
             <ArrowsPointingOutIcon className="w-4 h-4" />
         </button>
-    </div>
-);
-
-const LaunchScreen: React.FC<{ onConnect: () => void; t: TFunction }> = ({ onConnect, t }) => (
-    <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4 text-center">
-        <div className="max-w-md w-full bg-gray-800 p-8 rounded-2xl shadow-2xl border border-purple-500/30">
-            <div className="mb-6 inline-block p-4 rounded-full bg-purple-900/30 border border-purple-500/50">
-                <SparklesIcon className="w-12 h-12 text-purple-400" />
-            </div>
-            <h1 className="text-3xl font-bold text-white mb-4">{t('title')}</h1>
-            <p className="text-gray-300 mb-8">
-                To use the advanced <strong>Gemini 3 Pro</strong> features (High Resolution, Magic Enhance), you need to connect a Google Cloud project.
-            </p>
-            <button
-                onClick={onConnect}
-                className="w-full py-3 px-6 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-xl transition-all transform hover:scale-105 shadow-lg flex items-center justify-center gap-2"
-            >
-                <span>Connect Google Project</span>
-                <ArrowRightIcon className="w-5 h-5" />
-            </button>
-             <p className="text-xs text-gray-500 mt-4">
-                Select a project with a linked billing account for 2K/4K generation.
-            </p>
-        </div>
     </div>
 );
 
@@ -332,11 +306,6 @@ const LandingScreen: React.FC<{ onConfigSave: (config: FirebaseConfig) => void; 
                                     >
                                         {loading ? '...' : t('loginButton')}
                                     </button>
-                                    <div className="mt-4 text-center">
-                                        <p className="text-xs text-gray-500">
-                                            Private Access Only.
-                                        </p>
-                                    </div>
                                 </form>
                              )}
                         </div>
@@ -426,12 +395,9 @@ const getClosestAspectRatio = (width: number, height: number): '1:1' | '16:9' | 
 
 const App: React.FC = () => {
   const [lang, setLang] = useState<Language>('zh');
-  const [hasKey, setHasKey] = useState<boolean>(false);
   const [appState, setAppState] = useState<'landing' | 'app'>('landing');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [firebaseInitialized, setFirebaseInitialized] = useState(false);
-  const [isCustomKey, setIsCustomKey] = useState(false);
-  const [showKeyModal, setShowKeyModal] = useState(false);
   const [showWatermarkModal, setShowWatermarkModal] = useState(false);
   const [showVideoPromptModal, setShowVideoPromptModal] = useState(false);
 
@@ -538,25 +504,6 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, [appState, firebaseInitialized]);
 
-  // Initial Key Check
-  useEffect(() => {
-      const customKey = localStorage.getItem('custom_gemini_api_key');
-      const systemKeyExists = hasSystemKey();
-
-      if (customKey) {
-          setIsCustomKey(true);
-          // If custom key exists, we don't automatically show modal, user is "ready"
-      } else if (systemKeyExists) {
-          // If no custom key but system key exists, we are good to go!
-          // DO NOT show modal.
-      } else {
-          // No keys at all, must show modal
-          setShowKeyModal(true);
-      }
-  }, []);
-
-  useEffect(() => { setHasKey(true); }, []);
-
   const handleConfigSave = (config: FirebaseConfig) => { try { initializeFirebase(config); setFirebaseInitialized(true); } catch (e: any) { alert(e.message); } };
   const refreshUserProfile = async () => { if (userProfile) { try { const updated = await getUserProfile(userProfile.uid); setUserProfile(updated); } catch(e) {} } };
 
@@ -594,21 +541,6 @@ const App: React.FC = () => {
           } catch(e) {}
       }
   }
-
-  const handleSaveApiKey = (newKey: string) => {
-      localStorage.setItem('custom_gemini_api_key', newKey);
-      setIsCustomKey(true);
-      setShowKeyModal(false);
-      window.location.reload();
-  };
-
-  const handleChangeKey = () => {
-      setShowKeyModal(true);
-  };
-
-  const handleConnectApiKey = () => {
-    setHasKey(true);
-  };
   
   const handleAddWatermarkImage = (dataUrl: string) => {
       const newImage: UploadedImage = { id: `watermark-${Date.now()}`, file: new File([], "watermark.png"), dataUrl };
@@ -689,7 +621,10 @@ const App: React.FC = () => {
       }
     } catch (e: any) {
       console.error(e);
-      setError(e.message || "An error occurred.");
+      const msg = e.message || '';
+      if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) setError('API Permission Denied. Please check your custom API key.');
+      else if (msg.includes('RESOURCE_EXHAUSTED')) setError(t('rateLimitError'));
+      else setError(msg);
       setApiResult({ text: null, imageUrl: previousResultUrl });
     } finally {
       setLoading(false);
@@ -806,11 +741,9 @@ const App: React.FC = () => {
   const handleSavePhotoEditor = (id: string, dataUrl: string) => { setUploadedImages(prev => prev.map(img => img.id === id ? { ...img, dataUrl } : img)); setEditingImage(null); };
 
   if (appState === 'landing') return <LandingScreen onConfigSave={handleConfigSave} onAuthSuccess={() => {}} t={t} />;
-  if (!hasKey) return <LaunchScreen onConnect={handleConnectApiKey} t={t} />;
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 font-sans relative">
-      {showKeyModal && <ApiKeyWelcomeModal onSave={handleSaveApiKey} t={t} />}
       {showWatermarkModal && (
         <WatermarkModal 
             onClose={() => setShowWatermarkModal(false)} 
@@ -840,12 +773,8 @@ const App: React.FC = () => {
              <div className="text-center md:text-left">
                 <h1 className="text-4xl lg:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">
                     {t('title')} 
-                    <span className="text-xs bg-gray-800 text-gray-400 px-2 py-1 rounded border border-gray-600 align-middle ml-2 inline-flex items-center gap-1">
-                        Gemini 2.5 (v2025.12.04) (Vercel Fix)
-                        {isCustomKey ? <span className="text-green-400 ml-1">● Custom Key</span> : <span className="text-yellow-500 ml-1">● System Key</span>}
-                        <span className="text-[10px] text-gray-500 font-mono ml-1" title="Active Key ID">
-                            ({getActiveKeyMasked()})
-                        </span>
+                    <span className="text-xs bg-gray-800 text-gray-400 px-2 py-1 rounded border border-gray-600 align-middle ml-2">
+                        Gemini 2.5 (v2025.12.01)
                     </span>
                 </h1>
                 <p className="text-gray-400 mt-2">{t('subtitle')}</p>
@@ -862,13 +791,6 @@ const App: React.FC = () => {
                     {t('logoutButton')}
                 </button>
                 <div className="flex gap-2 border-l border-gray-600 pl-4">
-                    <button 
-                        onClick={handleChangeKey} 
-                        className={`p-1 transition-colors ${isCustomKey ? 'text-green-400 hover:text-green-300' : 'text-gray-400 hover:text-white'}`} 
-                        title={isCustomKey ? "Using Custom Key (Click to Change)" : "Using Default Key (Click to Set Custom)"}
-                    >
-                        <KeyIcon className="w-5 h-5" />
-                    </button>
                     <button onClick={() => setLang('en')} className={`px-2 py-1 text-xs rounded-md ${lang === 'en' ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}>EN</button>
                     <button onClick={() => setLang('zh')} className={`px-2 py-1 text-xs rounded-md ${lang === 'zh' ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}>中文</button>
                 </div>
@@ -1103,22 +1025,16 @@ const App: React.FC = () => {
               )}
 
               {error && (
-                <div className="p-4 bg-red-900/30 border border-red-500/50 rounded-xl text-red-200 text-sm whitespace-pre-line">
+                <div className="p-4 bg-red-900/30 border border-red-500/50 rounded-xl text-red-200 text-sm">
                   <p className="font-bold flex items-center gap-2">
                     <span className="text-xl">⚠️</span> {t('errorTitle')}
                   </p>
                   <p className="mt-1">{error}</p>
-                  
-                  {/* New Button for updating API Key directly from error message */}
-                  {(error.includes('PERMISSION_DENIED') || error.includes('403')) && (
-                      <button 
-                        onClick={() => setShowKeyModal(true)}
-                        className="mt-3 w-full bg-red-700 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-lg"
-                      >
-                          <KeyIcon className="w-5 h-5" />
-                          更新/輸入 API Key
-                      </button>
-                  )}
+                   {error === 'PERMISSION_DENIED_UI' && (
+                        <p className="mt-2 text-xs text-red-300">
+                             Tip: Check your API Key permissions or quota.
+                        </p>
+                   )}
                 </div>
               )}
             </div>

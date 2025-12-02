@@ -1,8 +1,6 @@
-
 import React, { useState } from 'react';
 import type { TFunction } from '../types';
-import { KeyIcon, ArrowRightIcon, SparklesIcon, TrashIcon, RefreshIcon } from './Icons';
-import { validateGeminiKey, hasSystemKey } from '../services/geminiService';
+import { KeyIcon, ArrowRightIcon, SparklesIcon } from './Icons';
 
 interface ApiKeyWelcomeModalProps {
     onSave: (apiKey: string) => void;
@@ -11,8 +9,6 @@ interface ApiKeyWelcomeModalProps {
 
 export const ApiKeyWelcomeModal: React.FC<ApiKeyWelcomeModalProps> = ({ onSave, t }) => {
     const [inputKey, setInputKey] = useState('');
-    const [isTesting, setIsTesting] = useState(false);
-    const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
     const handleSave = () => {
         if (inputKey.trim().length > 10) {
@@ -22,34 +18,6 @@ export const ApiKeyWelcomeModal: React.FC<ApiKeyWelcomeModalProps> = ({ onSave, 
         }
     };
 
-    const handleTestConnection = async () => {
-        if (inputKey.trim().length < 10) {
-            setTestResult({ success: false, message: "Key 太短，請輸入完整 Key" });
-            return;
-        }
-        setIsTesting(true);
-        setTestResult(null);
-        try {
-            const result = await validateGeminiKey(inputKey.trim());
-            setTestResult({ success: result.valid, message: result.message });
-        } catch (e) {
-            setTestResult({ success: false, message: "測試發生未知錯誤" });
-        } finally {
-            setIsTesting(false);
-        }
-    };
-
-    const handleClear = () => {
-        if (window.confirm("確定要清除瀏覽器中的 Key 並重置嗎？\n如果您在 GitHub 有設定 Secrets，重置後將會使用 GitHub 的設定。")) {
-            localStorage.removeItem('custom_gemini_api_key');
-            window.location.reload();
-        }
-    }
-
-    // Check if there's a key currently in local storage to decide if we show the clear button
-    const hasStoredKey = !!localStorage.getItem('custom_gemini_api_key');
-    const systemKeyExists = hasSystemKey();
-
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/95 backdrop-blur-md animate-fade-in">
             <div className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md border border-purple-500/30 overflow-hidden">
@@ -57,19 +25,18 @@ export const ApiKeyWelcomeModal: React.FC<ApiKeyWelcomeModalProps> = ({ onSave, 
                     <div className="inline-block p-3 bg-white/10 rounded-full mb-4">
                         <SparklesIcon className="w-10 h-10 text-yellow-300" />
                     </div>
-                    <h2 className="text-2xl font-bold text-white mb-2">API Key 設定</h2>
-                    <p className="text-purple-200 text-sm">Bring Your Own Key (BYOK)</p>
+                    <h2 className="text-2xl font-bold text-white mb-2">歡迎使用 Ivan Ai Photo</h2>
+                    <p className="text-purple-200 text-sm">Bring Your Own Key (BYOK) 平台</p>
                 </div>
                 
                 <div className="p-8 space-y-6">
                     <div className="text-gray-300 text-sm leading-relaxed">
                         <p className="mb-4">
-                            本平台使用 <strong>Google Gemini</strong> 模型。
-                            為確保穩定性與配額，請輸入您的 API Key。
+                            本平台提供強大的 AI 修圖介面，並使用 <strong>Google Gemini</strong> 模型。
+                            為了確保服務穩定，請使用您自己的 API Key。
                         </p>
                         <ul className="list-disc list-inside space-y-1 text-gray-400 pl-2">
-                            <li>文字生成配額較高，生圖配額較低。</li>
-                            <li>若遇到 RATE_LIMIT，請稍後再試或更換 Key。</li>
+                            <li>您的 Key 僅儲存在瀏覽器，不會上傳</li>
                         </ul>
                     </div>
 
@@ -93,65 +60,20 @@ export const ApiKeyWelcomeModal: React.FC<ApiKeyWelcomeModalProps> = ({ onSave, 
                             <input 
                                 type="text" 
                                 value={inputKey}
-                                onChange={(e) => {
-                                    setInputKey(e.target.value);
-                                    setTestResult(null);
-                                }}
+                                onChange={(e) => setInputKey(e.target.value)}
                                 placeholder="貼上您的 API Key (AIza...)"
                                 className="w-full bg-gray-900 text-white pl-10 pr-4 py-3 rounded-lg border border-gray-600 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none transition-all"
                             />
                         </div>
-                        {testResult && (
-                            <div className={`text-xs p-2 rounded whitespace-pre-wrap ${testResult.success ? 'bg-green-900/50 text-green-200 border border-green-700' : 'bg-red-900/50 text-red-200 border border-red-700'}`}>
-                                {testResult.success ? '✅ ' : '❌ '}{testResult.message}
-                            </div>
-                        )}
                     </div>
 
-                    <div className="flex gap-2">
-                        <button
-                            onClick={handleTestConnection}
-                            disabled={inputKey.length < 10 || isTesting}
-                            className="px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                            title="測試此 Key 是否可用"
-                        >
-                            {isTesting ? <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div> : <RefreshIcon className="w-5 h-5" />}
-                            <span className="hidden sm:inline">測試連線</span>
-                        </button>
-
-                        <button 
-                            onClick={handleSave}
-                            disabled={inputKey.length < 10}
-                            className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-xl shadow-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                        >
-                            儲存並開始
-                        </button>
-                    </div>
-                    
-                    {hasStoredKey ? (
-                        <div className="pt-4 border-t border-gray-700 text-center">
-                            <button
-                                onClick={handleClear}
-                                className="text-xs text-red-400 hover:text-red-300 underline flex items-center justify-center gap-1 mx-auto"
-                                title="清除舊 Key / 使用預設值"
-                            >
-                                <TrashIcon className="w-4 h-4" />
-                                <span>清除目前的 Key (使用網站內建 Key)</span>
-                            </button>
-                        </div>
-                    ) : systemKeyExists && (
-                        <div className="pt-4 border-t border-gray-700 text-center">
-                            <button
-                                onClick={() => {
-                                    localStorage.removeItem('custom_gemini_api_key');
-                                    window.location.reload();
-                                }}
-                                className="w-full py-2 bg-yellow-600/30 hover:bg-yellow-600/50 text-yellow-200 border border-yellow-600/50 font-bold rounded-xl transition-colors text-sm"
-                            >
-                                使用網站內建 Key (Use System Key)
-                            </button>
-                        </div>
-                    )}
+                    <button 
+                        onClick={handleSave}
+                        disabled={inputKey.length < 10}
+                        className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-xl shadow-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    >
+                        開始使用
+                    </button>
                 </div>
             </div>
         </div>

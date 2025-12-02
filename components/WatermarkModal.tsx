@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { TFunction } from '../types';
 import { CloseIcon, SparklesIcon, DownloadIcon, TextIcon } from './Icons';
