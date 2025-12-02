@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import type { TFunction } from '../types';
 import { KeyIcon, ArrowRightIcon, SparklesIcon, TrashIcon, RefreshIcon } from './Icons';
-import { validateGeminiKey } from '../services/geminiService';
+import { validateGeminiKey, hasSystemKey } from '../services/geminiService';
 
 interface ApiKeyWelcomeModalProps {
     onSave: (apiKey: string) => void;
@@ -48,6 +48,7 @@ export const ApiKeyWelcomeModal: React.FC<ApiKeyWelcomeModalProps> = ({ onSave, 
 
     // Check if there's a key currently in local storage to decide if we show the clear button
     const hasStoredKey = !!localStorage.getItem('custom_gemini_api_key');
+    const systemKeyExists = hasSystemKey();
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/95 backdrop-blur-md animate-fade-in">
@@ -127,7 +128,7 @@ export const ApiKeyWelcomeModal: React.FC<ApiKeyWelcomeModalProps> = ({ onSave, 
                         </button>
                     </div>
                     
-                    {hasStoredKey && (
+                    {hasStoredKey ? (
                         <div className="pt-4 border-t border-gray-700 text-center">
                             <button
                                 onClick={handleClear}
@@ -136,6 +137,18 @@ export const ApiKeyWelcomeModal: React.FC<ApiKeyWelcomeModalProps> = ({ onSave, 
                             >
                                 <TrashIcon className="w-4 h-4" />
                                 <span>清除目前的 Key (使用網站內建 Key)</span>
+                            </button>
+                        </div>
+                    ) : systemKeyExists && (
+                        <div className="pt-4 border-t border-gray-700 text-center">
+                            <button
+                                onClick={() => {
+                                    localStorage.removeItem('custom_gemini_api_key');
+                                    window.location.reload();
+                                }}
+                                className="w-full py-2 bg-yellow-600/30 hover:bg-yellow-600/50 text-yellow-200 border border-yellow-600/50 font-bold rounded-xl transition-colors text-sm"
+                            >
+                                使用網站內建 Key (Use System Key)
                             </button>
                         </div>
                     )}

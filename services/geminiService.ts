@@ -2,6 +2,11 @@
 import { GoogleGenAI, Modality, type GenerateContentResponse } from '@google/genai';
 import type { GeminiImagePart, ImageResolution } from '../types';
 
+// Check if a system-level key exists (from build env)
+export const hasSystemKey = (): boolean => {
+    return !!process.env.API_KEY && process.env.API_KEY.length > 10;
+};
+
 // Dynamic retrieval function
 const getActiveKey = (): string => {
     try {
@@ -52,23 +57,22 @@ const handleGeminiError = async (error: unknown, context: string, attempt: numbe
     // Handle Permissions (403 / PERMISSION_DENIED)
     if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) {
         let hint = "";
+        const isFirebaseKey = getActiveKey().startsWith("AIzaSyC0");
         
-        // Specific checks for common user errors
-        if (getActiveKey().startsWith("AIzaSyC0")) {
-             // This is a common prefix for Firebase Browser keys, not Gemini API keys usually
-             hint = "\n[警告] 您似乎使用了 Firebase Browser Key 而非 Gemini API Key。請前往 AI Studio 重新申請。";
+        if (isFirebaseKey) {
+             hint = "\n[警告] 您似乎使用了 Firebase Browser Key (AIzaSyC0...)。Gemini 生圖通常需要獨立的 Gemini API Key。";
         } else if (msg.includes("BILLING_DISABLED") || context.includes("Image")) {
-            hint = "\n[重要] 此專案可能未啟用 Billing (計費)。\n注意：'gemini-2.5-flash-image' (生圖) 通常要求專案綁定計費帳戶，即使是免費額度內。\n如果您在 AI Studio 測試成功，那邊使用的是不同的沙盒環境。";
+            hint = "\n[常見原因]：\n1. 專案未連結帳單 (Billing Account)。生圖模型通常需要付費帳號。\n2. **API 限制設定錯誤**：請檢查 GCP Console > Credentials > API Key > **API restrictions** 分頁，確保已勾選 'Generative Language API'。";
         } else {
-            hint = "\n原因是：Key 不正確、專案未連結帳單(Billing)、或未啟用 'Generative Language API'。";
+            hint = "\n原因是：Key 不正確、專案未連結帳單、或網域限制(Referrer)阻擋了請求。";
         }
 
         throw new Error(`PERMISSION_DENIED (403): 權限被拒。${hint}
 
 【解決方法】
 1. 請點擊下方的 **「🔑 更新/輸入 API Key」** 按鈕。
-2. 確保您輸入的是 **Gemini API Key** (AI Studio)，而非 Firebase Key。
-3. 如果測試成功但生圖失敗，請檢查 GCP Console 的 Billing 設定。
+2. 如果您是用付費 Key，請確保 GCP 專案已連結信用卡。
+3. 檢查 GCP Console 金鑰設定底部的 **「API restrictions」** 分頁。
 
 目前使用的 Key 結尾是：${getActiveKeyMasked()}`);
     }
@@ -89,13 +93,13 @@ export const validateGeminiKey = async (apiKey: string): Promise<{ valid: boolea
             model: 'gemini-2.5-flash',
             contents: { parts: [{ text: "Hello" }] },
         });
-        return { valid: true, message: "連線成功！API Key 有效 (文字模型)。\n注意：若生圖仍失敗，通常是 Billing 未啟用。" };
+        return { valid: true, message: "連線成功！API Key 有效 (文字模型)。\n注意：若生圖仍失敗，通常是 GCP 專案的 Billing 未啟用，或 API 限制 (API Restrictions) 未包含 Generative Language API。" };
     } catch (error: any) {
         console.error("Key Validation Error:", error);
         let msg = error.message || "未知錯誤";
         
         if (msg.includes("API_KEY_INVALID")) msg = "無效的 API Key (API_KEY_INVALID)。請重新複製。";
-        else if (msg.includes("PERMISSION_DENIED")) msg = "權限被拒 (403)。請確認 GCP Console 中的 'Generative Language API' 已啟用。";
+        else if (msg.includes("PERMISSION_DENIED")) msg = "權限被拒 (403)。\n請檢查：\n1. 網域限制 (Application restrictions)\n2. **API 限制 (API restrictions)** 是否包含 Generative Language API。";
         else if (msg.includes("BILLING_DISABLED")) msg = "專案未啟用計費 (Billing)。";
         else if (msg.includes("RESOURCE_EXHAUSTED")) msg = "配額已滿 (429)。";
         
