@@ -1,3 +1,4 @@
+
 const CACHE_NAME = 'ivan-ai-photo-cache-v40001';
 const APP_SHELL_URLS = [
   '/',
