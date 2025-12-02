@@ -51,7 +51,24 @@ const handleGeminiError = async (error: unknown, context: string, attempt: numbe
 
     // Handle Permissions (403 / PERMISSION_DENIED)
     if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) {
-        throw new Error('PERMISSION_DENIED (403): 權限被拒。\n\n【最終解決方案 / FINAL SOLUTION】\n既然您已確認 API 服務已啟用 (綠色打勾)，那麼問題 100% 出在「網站限制」。\n\n請立即執行以下步驟：\n1. 回到 Google Cloud Console 的 Key 設定頁面。\n2. 將「應用程式限制 (Application restrictions)」改選為 **「無 (None)」**。\n3. 儲存並等待 2 分鐘。\n\n這是唯一能確認 Key 是否正常的測試方法。');
+        throw new Error(`PERMISSION_DENIED (403): 權限被拒。
+
+【請依序檢查以下 3 點 / CHECKLIST】
+
+1. ⚠️ **API 服務未啟用 (100% 是這個原因)**：
+   您只設定了 Key 的限制，但沒有開啟服務！
+   請前往 Google Cloud Console > 左側選單 "APIs & Services" > "Library" (圖書館)。
+   搜尋 **"Generative Language API"**。
+   點擊進入，並按下 **「啟用 (ENABLE)」** 按鈕。
+
+2. 💳 **帳單帳戶 (Billing)**：
+   如果您使用的是付費 Key，請確保該 GCP 專案已連結有效的信用卡/帳單帳戶。
+
+3. 🔑 **Key 是否正確**：
+   App 目前使用的 Key 結尾是：${getActiveKeyMasked()}
+   請確認這與您 Console 上的是否一致。
+
+Google 設定生效通常需要 2-3 分鐘，請開啟服務後稍等再試。`);
     }
 
     throw new Error(`${context} Error: ${msg}`);
