@@ -1,12 +1,20 @@
 import { GoogleGenAI, Modality, type GenerateContentResponse } from '@google/genai';
 import type { GeminiImagePart, ImageResolution } from '../types';
 
-// Dynamic retrieval function - Modified for Hosted Mode
-// It now directly uses the key injected by vite.config.ts
+// Dynamic retrieval function
 const getActiveKey = (): string => {
-    // Return the key defined in vite.config.ts
-    // This allows friends to use the app without entering a key.
-    return process.env.API_KEY || "";
+    const key = process.env.API_KEY || "";
+    
+    // DEBUG: 幫助您確認目前使用的是哪一把 Key
+    // 請在瀏覽器按 F12 -> Console 查看
+    if (!key) {
+        console.error("❌ Gemini Service: No API Key found!");
+    } else {
+        // 只顯示前 5 碼以供識別，確保安全
+        console.log(`🔑 Gemini Service: Using Key starting with: ${key.substring(0, 5)}...`);
+    }
+    
+    return key;
 };
 
 const handleGeminiError = (error: unknown, context: string): never => {
@@ -17,7 +25,7 @@ const handleGeminiError = (error: unknown, context: string): never => {
       throw new Error('額度已滿，請稍後再試 (Rate Limit Exceeded)');
     }
     if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) {
-      throw new Error('權限不足，請檢查 API Key 設定 (Permission Denied)');
+      throw new Error('權限不足 (Permission Denied)。請檢查：1. Google Cloud 網址限制是否正確 2. API Key 是否有效。');
     }
     throw new Error(`${context} Error: ${msg}`);
   }
@@ -30,6 +38,8 @@ export const generateImageWithGemini = async (
 ): Promise<{ imageUrl: string }> => {
   
   const apiKey = getActiveKey();
+  if (!apiKey) throw new Error("API Key is missing. Please check configuration.");
+
   const ai = new GoogleGenAI({ apiKey });
   
   const extractImage = (response: any) => {
@@ -73,6 +83,8 @@ export const editImageWithGemini = async (
   prompt: string
 ): Promise<{ response: GenerateContentResponse }> => {
   const apiKey = getActiveKey();
+  if (!apiKey) throw new Error("API Key is missing.");
+
   const ai = new GoogleGenAI({ apiKey });
 
   const imageParts = images.map(image => ({
@@ -99,6 +111,8 @@ export const refinePrompt = async (
     language: string = 'en'
 ): Promise<string> => {
   const apiKey = getActiveKey();
+  if (!apiKey) return prompt; // Fail gracefully for prompt refinement
+
   const ai = new GoogleGenAI({ apiKey });
   try {
     let systemInstruction = "";
@@ -149,6 +163,8 @@ export const generateWatermark = async (params: WatermarkParams): Promise<string
 // NEW: Video Prompt Generation
 export const generateVideoPrompt = async (image: GeminiImagePart, language: string = 'en'): Promise<string> => {
     const apiKey = getActiveKey();
+    if (!apiKey) return "Error: API Key missing.";
+
     const ai = new GoogleGenAI({ apiKey });
 
     const systemInstruction = language === 'zh' 
@@ -185,6 +201,8 @@ export const generatePoeticText = async (
     imagePart?: GeminiImagePart
 ): Promise<string> => {
     const apiKey = getActiveKey();
+    if (!apiKey) return "Error: API Key missing.";
+
     const ai = new GoogleGenAI({ apiKey });
 
     // Determine specific language instructions
