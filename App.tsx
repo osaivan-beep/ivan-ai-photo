@@ -1097,6 +1097,17 @@ const App: React.FC = () => {
                     <span className="text-xl">⚠️</span> {t('errorTitle')}
                   </p>
                   <p className="mt-1">{error}</p>
+                  
+                  {/* New Button for updating API Key directly from error message */}
+                  {(error.includes('PERMISSION_DENIED') || error.includes('403')) && (
+                      <button 
+                        onClick={() => setShowKeyModal(true)}
+                        className="mt-3 w-full bg-red-700 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-lg"
+                      >
+                          <KeyIcon className="w-5 h-5" />
+                          更新/輸入 API Key
+                      </button>
+                  )}
                 </div>
               )}
             </div>
