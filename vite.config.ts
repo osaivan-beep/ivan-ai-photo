@@ -1,26 +1,30 @@
+
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
-  // Load env file based on `mode` in the current working directory.
+  // 載入本地 .env 檔案
   const env = loadEnv(mode, (process as any).cwd(), '');
 
-  // 優先順序: GitHub Actions (process.env) > 本地 .env (env) > 空字串
-  const finalApiKey = process.env.API_KEY || env.API_KEY || "";
+  // 關鍵修正：
+  // 1. process.env.API_KEY: 這是 GitHub Actions 傳入的 Secret。
+  // 2. env.API_KEY: 這是本地 .env 檔案的變數。
+  // 3. "": 如果都沒抓到，就留空 (不要再填寫任何 AIza 開頭的字串以免再次外洩被封鎖)。
+  const apiKey = process.env.API_KEY || env.API_KEY || "";
 
-  // 在 Build 過程中顯示是否成功抓取到 Key (這會顯示在 GitHub Actions 的 Log 中，不會洩漏 Key)
-  if (finalApiKey) {
+  // 在 Build 階段檢查是否有抓到 Key (這會顯示在 GitHub Actions 的 Log 裡)
+  if (apiKey) {
     console.log("✅ Build: API Key detected successfully.");
   } else {
-    console.warn("⚠️ Build: No API Key detected! The app will not work.");
+    console.warn("⚠️ Build: No API Key detected! The app will not work properly.");
   }
 
   return {
     plugins: [react()],
-    base: '/ivan-ai-photo/', 
+    base: '/ivan-ai-photo/', // GitHub Pages repository name
     define: {
-      // 直接注入 Key，不再使用範例字串
-      'process.env.API_KEY': JSON.stringify(finalApiKey) 
+      // 將抓到的 Key 注入到網頁程式中
+      'process.env.API_KEY': JSON.stringify(apiKey) 
     },
     build: {
       outDir: 'dist',
