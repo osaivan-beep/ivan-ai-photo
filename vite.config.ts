@@ -1,4 +1,3 @@
-
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -13,10 +12,13 @@ export default defineConfig(({ mode }) => {
     define: {
       // -----------------------------------------------------------------------
       // 修正重點 / FIX:
-      // 優先讀取 `env.API_KEY` (來自 GitHub Secrets)。
-      // 如果本地開發沒有設定環境變數，才會使用後面的字串。
+      // 1. process.env.API_KEY: 這是 GitHub Actions (CI/CD) 注入 Secret 的位置。
+      // 2. env.API_KEY: 這是本地 .env 檔案的位置。
+      // 3. 最後的字串是防呆用的範例 Key (實際上不會運作，因為它已被限制)。
+      //
+      // 這樣修改後，GitHub 打包時就會抓到您設定好的 Secret 了。
       // -----------------------------------------------------------------------
-      'process.env.API_KEY': JSON.stringify(env.API_KEY || "AIzaSyCeR52YbrlvyOqk8-cOyTwEVZ9TYRrbdCg") 
+      'process.env.API_KEY': JSON.stringify(process.env.API_KEY || env.API_KEY || "AIzaSyCeR52YbrlvyOqk8-cOyTwEVZ9TYRrbdCg") 
     },
     build: {
       outDir: 'dist',
