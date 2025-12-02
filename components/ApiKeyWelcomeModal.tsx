@@ -101,7 +101,7 @@ export const ApiKeyWelcomeModal: React.FC<ApiKeyWelcomeModalProps> = ({ onSave, 
                             />
                         </div>
                         {testResult && (
-                            <div className={`text-xs p-2 rounded ${testResult.success ? 'bg-green-900/50 text-green-200 border border-green-700' : 'bg-red-900/50 text-red-200 border border-red-700'}`}>
+                            <div className={`text-xs p-2 rounded whitespace-pre-wrap ${testResult.success ? 'bg-green-900/50 text-green-200 border border-green-700' : 'bg-red-900/50 text-red-200 border border-red-700'}`}>
                                 {testResult.success ? '✅ ' : '❌ '}{testResult.message}
                             </div>
                         )}
@@ -125,17 +125,20 @@ export const ApiKeyWelcomeModal: React.FC<ApiKeyWelcomeModalProps> = ({ onSave, 
                         >
                             儲存並開始
                         </button>
-                        
-                        {hasStoredKey && (
+                    </div>
+                    
+                    {hasStoredKey && (
+                        <div className="pt-4 border-t border-gray-700 text-center">
                             <button
                                 onClick={handleClear}
-                                className="px-4 py-3 bg-red-900/30 hover:bg-red-900/50 text-red-300 border border-red-800 rounded-xl transition-colors flex items-center justify-center"
+                                className="text-xs text-red-400 hover:text-red-300 underline flex items-center justify-center gap-1 mx-auto"
                                 title="清除舊 Key / 使用預設值"
                             >
-                                <TrashIcon className="w-5 h-5" />
+                                <TrashIcon className="w-4 h-4" />
+                                <span>清除目前的 Key (使用網站內建 Key)</span>
                             </button>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

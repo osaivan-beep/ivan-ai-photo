@@ -52,18 +52,23 @@ const handleGeminiError = async (error: unknown, context: string, attempt: numbe
     // Handle Permissions (403 / PERMISSION_DENIED)
     if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) {
         let hint = "";
-        if (msg.includes("BILLING_DISABLED")) {
-            hint = "\n原因是：此 Google Cloud 專案尚未連結帳單 (Billing Account)。生圖模型通常需要付費帳號權限。";
+        
+        // Specific checks for common user errors
+        if (getActiveKey().startsWith("AIzaSyC0")) {
+             // This is a common prefix for Firebase Browser keys, not Gemini API keys usually
+             hint = "\n[警告] 您似乎使用了 Firebase Browser Key 而非 Gemini API Key。請前往 AI Studio 重新申請。";
+        } else if (msg.includes("BILLING_DISABLED") || context.includes("Image")) {
+            hint = "\n[重要] 此專案可能未啟用 Billing (計費)。\n注意：'gemini-2.5-flash-image' (生圖) 通常要求專案綁定計費帳戶，即使是免費額度內。\n如果您在 AI Studio 測試成功，那邊使用的是不同的沙盒環境。";
         } else {
-            hint = "\n原因是：Key 不正確 或 專案未啟用 'Generative Language API'。";
+            hint = "\n原因是：Key 不正確、專案未連結帳單(Billing)、或未啟用 'Generative Language API'。";
         }
 
         throw new Error(`PERMISSION_DENIED (403): 權限被拒。${hint}
 
 【解決方法】
 1. 請點擊下方的 **「🔑 更新/輸入 API Key」** 按鈕。
-2. 在彈出視窗中貼上您的 Key，並按下 **「測試連線」**。
-3. 如果測試失敗，請回到 Google Cloud Console 檢查 API 是否啟用 (Enable)。
+2. 確保您輸入的是 **Gemini API Key** (AI Studio)，而非 Firebase Key。
+3. 如果測試成功但生圖失敗，請檢查 GCP Console 的 Billing 設定。
 
 目前使用的 Key 結尾是：${getActiveKeyMasked()}`);
     }
@@ -84,7 +89,7 @@ export const validateGeminiKey = async (apiKey: string): Promise<{ valid: boolea
             model: 'gemini-2.5-flash',
             contents: { parts: [{ text: "Hello" }] },
         });
-        return { valid: true, message: "連線成功！API Key 有效且服務已啟用。" };
+        return { valid: true, message: "連線成功！API Key 有效 (文字模型)。\n注意：若生圖仍失敗，通常是 Billing 未啟用。" };
     } catch (error: any) {
         console.error("Key Validation Error:", error);
         let msg = error.message || "未知錯誤";
