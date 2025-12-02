@@ -62,7 +62,7 @@ const handleGeminiError = async (error: unknown, context: string, attempt: numbe
         if (isFirebaseKey) {
              hint = "\n[警告] 您似乎使用了 Firebase Browser Key (AIzaSyC0...)。Gemini 生圖通常需要獨立的 Gemini API Key。";
         } else if (msg.includes("BILLING_DISABLED") || context.includes("Image")) {
-            hint = "\n[常見原因]：\n1. 專案未連結帳單 (Billing Account)。生圖模型通常需要付費帳號。\n2. **API 限制設定錯誤**：請檢查 GCP Console > Credentials > API Key > **API restrictions** 分頁，確保已勾選 'Generative Language API'。";
+            hint = "\n[常見原因]：\n1. 專案未連結帳單 (Billing Account)。\n2. **API 限制**：請檢查 GCP Console > Credentials > API Key > API restrictions，確保已勾選 'Generative Language API'。\n3. **網址限制**：請檢查 Application restrictions，確保已加入您的 Vercel 網址 (https://....vercel.app)。";
         } else {
             hint = "\n原因是：Key 不正確、專案未連結帳單、或網域限制(Referrer)阻擋了請求。";
         }
@@ -73,6 +73,7 @@ const handleGeminiError = async (error: unknown, context: string, attempt: numbe
 1. 請點擊下方的 **「🔑 更新/輸入 API Key」** 按鈕。
 2. 如果您是用付費 Key，請確保 GCP 專案已連結信用卡。
 3. 檢查 GCP Console 金鑰設定底部的 **「API restrictions」** 分頁。
+4. **重要：** 若在 Vercel 部署，請確保 GCP 的 Application restrictions 已加入新的 vercel.app 網址。
 
 目前使用的 Key 結尾是：${getActiveKeyMasked()}`);
     }
@@ -99,7 +100,7 @@ export const validateGeminiKey = async (apiKey: string): Promise<{ valid: boolea
         let msg = error.message || "未知錯誤";
         
         if (msg.includes("API_KEY_INVALID")) msg = "無效的 API Key (API_KEY_INVALID)。請重新複製。";
-        else if (msg.includes("PERMISSION_DENIED")) msg = "權限被拒 (403)。\n請檢查：\n1. 網域限制 (Application restrictions)\n2. **API 限制 (API restrictions)** 是否包含 Generative Language API。";
+        else if (msg.includes("PERMISSION_DENIED")) msg = "權限被拒 (403)。\n請檢查：\n1. 網域限制 (Application restrictions) 是否包含目前網址。\n2. **API 限制 (API restrictions)** 是否包含 Generative Language API。";
         else if (msg.includes("BILLING_DISABLED")) msg = "專案未啟用計費 (Billing)。";
         else if (msg.includes("RESOURCE_EXHAUSTED")) msg = "配額已滿 (429)。";
         
