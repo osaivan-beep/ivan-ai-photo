@@ -51,14 +51,19 @@ const handleGeminiError = async (error: unknown, context: string, attempt: numbe
 
     // Handle Permissions (403 / PERMISSION_DENIED)
     if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) {
-        throw new Error(`PERMISSION_DENIED (403): 權限被拒。
+        let hint = "";
+        if (msg.includes("BILLING_DISABLED")) {
+            hint = "\n原因是：此 Google Cloud 專案尚未連結帳單 (Billing Account)。生圖模型通常需要付費帳號權限。";
+        } else {
+            hint = "\n原因是：Key 不正確 或 專案未啟用 'Generative Language API'。";
+        }
 
-這通常是因為 **目前使用的 Key 不正確**，或該 Key 所屬的專案未啟用 "Generative Language API"。
+        throw new Error(`PERMISSION_DENIED (403): 權限被拒。${hint}
 
 【解決方法】
-1. 請確認您剛剛啟用 API 的專案，是否與您貼上的 Key 屬於同一個專案。
-2. 請點擊下方的 **「更新/輸入 API Key」** 按鈕，重新貼上正確的 Key。
-3. 確保 Google Cloud Console 中的 "Generative Language API" 已啟用。
+1. 請點擊下方的 **「🔑 更新/輸入 API Key」** 按鈕。
+2. 在彈出視窗中貼上您的 Key，並按下 **「測試連線」**。
+3. 如果測試失敗，請回到 Google Cloud Console 檢查 API 是否啟用 (Enable)。
 
 目前使用的 Key 結尾是：${getActiveKeyMasked()}`);
     }
@@ -66,6 +71,31 @@ const handleGeminiError = async (error: unknown, context: string, attempt: numbe
     throw new Error(`${context} Error: ${msg}`);
   }
   throw new Error(`An unknown error occurred while communicating with the ${context}.`);
+};
+
+// NEW: Function to validate key connectivity explicitly
+export const validateGeminiKey = async (apiKey: string): Promise<{ valid: boolean; message: string }> => {
+    if (!apiKey || apiKey.length < 10) return { valid: false, message: "Key 格式無效 (太短)" };
+    
+    try {
+        const ai = new GoogleGenAI({ apiKey });
+        // Use flash model for cheap/fast check of basic connectivity
+        await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: { parts: [{ text: "Hello" }] },
+        });
+        return { valid: true, message: "連線成功！API Key 有效且服務已啟用。" };
+    } catch (error: any) {
+        console.error("Key Validation Error:", error);
+        let msg = error.message || "未知錯誤";
+        
+        if (msg.includes("API_KEY_INVALID")) msg = "無效的 API Key (API_KEY_INVALID)。請重新複製。";
+        else if (msg.includes("PERMISSION_DENIED")) msg = "權限被拒 (403)。請確認 GCP Console 中的 'Generative Language API' 已啟用。";
+        else if (msg.includes("BILLING_DISABLED")) msg = "專案未啟用計費 (Billing)。";
+        else if (msg.includes("RESOURCE_EXHAUSTED")) msg = "配額已滿 (429)。";
+        
+        return { valid: false, message: `驗證失敗: ${msg}` };
+    }
 };
 
 export const generateImageWithGemini = async (

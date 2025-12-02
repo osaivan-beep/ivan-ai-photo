@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
 import type { TFunction } from '../types';
-import { KeyIcon, ArrowRightIcon, SparklesIcon, TrashIcon } from './Icons';
+import { KeyIcon, ArrowRightIcon, SparklesIcon, TrashIcon, RefreshIcon } from './Icons';
+import { validateGeminiKey } from '../services/geminiService';
 
 interface ApiKeyWelcomeModalProps {
     onSave: (apiKey: string) => void;
@@ -10,12 +11,31 @@ interface ApiKeyWelcomeModalProps {
 
 export const ApiKeyWelcomeModal: React.FC<ApiKeyWelcomeModalProps> = ({ onSave, t }) => {
     const [inputKey, setInputKey] = useState('');
+    const [isTesting, setIsTesting] = useState(false);
+    const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
     const handleSave = () => {
         if (inputKey.trim().length > 10) {
             onSave(inputKey.trim());
         } else {
             alert("請輸入有效的 Google Gemini API Key (通常以 AIza 開頭)");
+        }
+    };
+
+    const handleTestConnection = async () => {
+        if (inputKey.trim().length < 10) {
+            setTestResult({ success: false, message: "Key 太短，請輸入完整 Key" });
+            return;
+        }
+        setIsTesting(true);
+        setTestResult(null);
+        try {
+            const result = await validateGeminiKey(inputKey.trim());
+            setTestResult({ success: result.valid, message: result.message });
+        } catch (e) {
+            setTestResult({ success: false, message: "測試發生未知錯誤" });
+        } finally {
+            setIsTesting(false);
         }
     };
 
@@ -72,14 +92,32 @@ export const ApiKeyWelcomeModal: React.FC<ApiKeyWelcomeModalProps> = ({ onSave, 
                             <input 
                                 type="text" 
                                 value={inputKey}
-                                onChange={(e) => setInputKey(e.target.value)}
+                                onChange={(e) => {
+                                    setInputKey(e.target.value);
+                                    setTestResult(null);
+                                }}
                                 placeholder="貼上您的 API Key (AIza...)"
                                 className="w-full bg-gray-900 text-white pl-10 pr-4 py-3 rounded-lg border border-gray-600 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none transition-all"
                             />
                         </div>
+                        {testResult && (
+                            <div className={`text-xs p-2 rounded ${testResult.success ? 'bg-green-900/50 text-green-200 border border-green-700' : 'bg-red-900/50 text-red-200 border border-red-700'}`}>
+                                {testResult.success ? '✅ ' : '❌ '}{testResult.message}
+                            </div>
+                        )}
                     </div>
 
-                    <div className="flex gap-3">
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleTestConnection}
+                            disabled={inputKey.length < 10 || isTesting}
+                            className="px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            title="測試此 Key 是否可用"
+                        >
+                            {isTesting ? <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div> : <RefreshIcon className="w-5 h-5" />}
+                            <span className="hidden sm:inline">測試連線</span>
+                        </button>
+
                         <button 
                             onClick={handleSave}
                             disabled={inputKey.length < 10}
@@ -87,6 +125,7 @@ export const ApiKeyWelcomeModal: React.FC<ApiKeyWelcomeModalProps> = ({ onSave, 
                         >
                             儲存並開始
                         </button>
+                        
                         {hasStoredKey && (
                             <button
                                 onClick={handleClear}
