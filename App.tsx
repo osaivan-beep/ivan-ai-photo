@@ -841,7 +841,7 @@ const App: React.FC = () => {
                 <h1 className="text-4xl lg:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">
                     {t('title')} 
                     <span className="text-xs bg-gray-800 text-gray-400 px-2 py-1 rounded border border-gray-600 align-middle ml-2 inline-flex items-center gap-1">
-                        Gemini 2.5 (v2025.12.04) (Final Fix 8)
+                        Gemini 2.5 (v2025.12.04) (Vercel Fix)
                         {isCustomKey ? <span className="text-green-400 ml-1">● Custom Key</span> : <span className="text-yellow-500 ml-1">● System Key</span>}
                         <span className="text-[10px] text-gray-500 font-mono ml-1" title="Active Key ID">
                             ({getActiveKeyMasked()})
