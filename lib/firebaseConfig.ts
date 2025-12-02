@@ -1,4 +1,3 @@
-
 import type { FirebaseConfig } from '../types';
 
 /**
@@ -25,13 +24,3 @@ export const embeddedConfig: FirebaseConfig | null = {
   measurementId: "G-EX29ZPS2ET",
   adminEmail: "osa.ivan@gmail.com"
 };
-
-/**
- * ============================================================================
- * 【GEMINI AI KEY】
- * 
- * 這是專門用於 AI 生成圖片的 API Key (來自 Google AI Studio)。
- * This specific key is used for Gemini AI generation calls.
- * ============================================================================
- */
-export const geminiApiKey = "AIzaSyCeR52YbrlvyOqk8-cOyTwEVZ9TYRrbdCg";
