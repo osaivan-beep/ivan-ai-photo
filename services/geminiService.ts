@@ -1,17 +1,18 @@
+
 import { GoogleGenAI, Modality, type GenerateContentResponse } from '@google/genai';
 import type { GeminiImagePart, ImageResolution } from '../types';
 
 // Dynamic retrieval function
 const getActiveKey = (): string => {
+    // 從環境變數讀取 Key (由 vite.config.ts 注入)
     const key = process.env.API_KEY || "";
     
-    // DEBUG: 幫助您確認目前使用的是哪一把 Key
-    // 請在瀏覽器按 F12 -> Console 查看
+    // DEBUG: 在瀏覽器 Console 顯示狀態，幫助除錯
     if (!key) {
-        console.error("❌ Gemini Service: No API Key found!");
+        console.error("❌ Gemini Service: API Key is MISSING! Please check GitHub Secrets.");
     } else {
-        // 只顯示前 5 碼以供識別，確保安全
-        console.log(`🔑 Gemini Service: Using Key starting with: ${key.substring(0, 5)}...`);
+        // 只顯示前 5 碼確認是否為新 Key，確保安全
+        console.log(`🔑 Gemini Service: API Key loaded. Starts with: ${key.substring(0, 5)}...`);
     }
     
     return key;
@@ -24,8 +25,9 @@ const handleGeminiError = (error: unknown, context: string): never => {
     if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')) {
       throw new Error('額度已滿，請稍後再試 (Rate Limit Exceeded)');
     }
-    if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) {
-      throw new Error('權限不足 (Permission Denied)。請檢查：1. Google Cloud 網址限制是否正確 2. API Key 是否有效。');
+    // 特別針對 Key 被封鎖或權限錯誤的提示
+    if (msg.includes('PERMISSION_DENIED') || msg.includes('403') || msg.includes('API key was reported as leaked')) {
+      throw new Error('API Key 無效或被封鎖 (Key Leaked/Invalid)。請更換新的 API Key 並更新 GitHub Secrets。');
     }
     throw new Error(`${context} Error: ${msg}`);
   }
@@ -38,7 +40,8 @@ export const generateImageWithGemini = async (
 ): Promise<{ imageUrl: string }> => {
   
   const apiKey = getActiveKey();
-  if (!apiKey) throw new Error("API Key is missing. Please check configuration.");
+  // 如果沒有 Key，直接拋出清楚的錯誤
+  if (!apiKey) throw new Error("系統未偵測到 API Key。請管理員檢查 GitHub Secrets 設定。");
 
   const ai = new GoogleGenAI({ apiKey });
   
@@ -58,7 +61,6 @@ export const generateImageWithGemini = async (
   try {
     // Using Gemini 2.5 Flash Image
     const config: any = {};
-    // Only pass aspect ratio if strictly provided (Text-to-Image)
     if (aspectRatio) {
         config.imageConfig = { aspectRatio: aspectRatio };
     }
@@ -111,7 +113,7 @@ export const refinePrompt = async (
     language: string = 'en'
 ): Promise<string> => {
   const apiKey = getActiveKey();
-  if (!apiKey) return prompt; // Fail gracefully for prompt refinement
+  if (!apiKey) return prompt; 
 
   const ai = new GoogleGenAI({ apiKey });
   try {
