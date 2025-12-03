@@ -18,7 +18,6 @@ import { AdminUserList } from './components/AdminUserList';
 import { embeddedConfig } from './lib/firebaseConfig';
 import { WatermarkModal } from './components/WatermarkModal';
 import { VideoPromptModal } from './components/VideoPromptModal';
-import { ApiKeyWelcomeModal } from './components/ApiKeyWelcomeModal';
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -347,7 +346,6 @@ const App: React.FC = () => {
   const [firebaseInitialized, setFirebaseInitialized] = useState(false);
   const [showWatermarkModal, setShowWatermarkModal] = useState(false);
   const [showVideoPromptModal, setShowVideoPromptModal] = useState(false);
-  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
@@ -385,22 +383,6 @@ const App: React.FC = () => {
   useEffect(() => {
     setAllQuickPrompts(translations[lang].defaultQuickPrompts);
   }, [lang]);
-
-  // Check for API Key ONLY when logged in (appState === 'app')
-  useEffect(() => {
-    if (appState === 'app') {
-        const key = getActiveKey();
-        if (!key) {
-            setShowApiKeyModal(true);
-        }
-    }
-  }, [appState]);
-
-  const handleApiKeySave = (key: string) => {
-      setStoredKey(key);
-      setShowApiKeyModal(false);
-      setError(null);
-  };
 
   const selectedImage = uploadedImages.find(img => img.id === selectedImageId) || null;
   
@@ -472,13 +454,7 @@ const App: React.FC = () => {
       console.error(e);
       const msg = e.message || '';
       
-      // Strict check for API Key Validity
-      // 只有在明確是 Key 錯誤 (403/Permission Denied) 時才彈窗，
-      // 避免 Rate Limit (429) 時跳出，造成使用者困擾。
-      if (msg === 'API_KEY_INVALID') {
-          setError('API Key Invalid or Missing. Please enter your Gemini API Key.');
-          setShowApiKeyModal(true);
-      } else if (msg.includes('permission-denied')) {
+      if (msg.includes('permission-denied')) {
           setShowPermissionHelp(true);
       } else {
           // 一般錯誤 (含 Rate Limit) 直接顯示紅色警告
@@ -728,7 +704,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 font-sans relative">
-      {showApiKeyModal && <ApiKeyWelcomeModal onSave={handleApiKeySave} t={t} />}
       {showWatermarkModal && (
         <WatermarkModal 
             onClose={() => setShowWatermarkModal(false)} 
@@ -759,7 +734,7 @@ const App: React.FC = () => {
                 <h1 className="text-4xl lg:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">
                     {t('title')} 
                     <span className="text-xs bg-green-900 text-green-200 px-2 py-1 rounded border border-green-700 align-middle ml-2 font-bold shadow-sm">
-                        Gemini 2.5 (Public/BYOK)
+                        Pro
                     </span>
                 </h1>
                 <p className="text-gray-400 mt-2">{t('subtitle')}</p>
@@ -776,13 +751,6 @@ const App: React.FC = () => {
                     {t('logoutButton')}
                 </button>
                 <div className="flex gap-2 border-l border-gray-600 pl-4 items-center">
-                    <button 
-                        onClick={() => setShowApiKeyModal(true)} 
-                        className="text-yellow-400 hover:text-white p-1 rounded animate-pulse" 
-                        title="Change API Key"
-                    >
-                        <KeyIcon className="w-5 h-5" />
-                    </button>
                     <button onClick={() => setLang('en')} className={`px-2 py-1 text-xs rounded-md ${lang === 'en' ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}>EN</button>
                     <button onClick={() => setLang('zh')} className={`px-2 py-1 text-xs rounded-md ${lang === 'zh' ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}>中文</button>
                 </div>
@@ -1020,12 +988,6 @@ const App: React.FC = () => {
                       </div>
                       <button onClick={() => setError(null)} className="text-red-400 hover:text-white"><CloseIcon className="w-5 h-5"/></button>
                   </div>
-                   {/* Explicitly check if it's the Invalid Key error to show update button */}
-                   {error.includes('Key Invalid') && (
-                        <button onClick={() => setShowApiKeyModal(true)} className="mt-2 text-xs bg-red-700 hover:bg-red-600 px-2 py-1 rounded text-white underline">
-                             Update API Key
-                        </button>
-                   )}
                    
                    {/* Rate Limit Retry Button - Check for rate limit keywords */}
                    {(error.includes('Rate Limit') || error.includes('429') || error.includes('系統忙碌')) && (
