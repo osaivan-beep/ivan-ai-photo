@@ -74,7 +74,6 @@ const LandingScreen: React.FC<{ onConfigSave: (config: FirebaseConfig) => void; 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [systemConfigured, setSystemConfigured] = useState(false);
-    const [showForgotPassword, setShowForgotPassword] = useState(false);
 
     useEffect(() => {
         setSystemConfigured(isFirebaseConfigured());
@@ -94,7 +93,6 @@ const LandingScreen: React.FC<{ onConfigSave: (config: FirebaseConfig) => void; 
 
         try {
             let clean = configStr.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1').trim();
-
             clean = clean
                 .replace(/：/g, ':')
                 .replace(/，/g, ',')
@@ -153,6 +151,7 @@ const LandingScreen: React.FC<{ onConfigSave: (config: FirebaseConfig) => void; 
                     setLoading(false);
                 }
             } else {
+                // Try Parsing as pure JSON
                 try {
                      const json = JSON.parse(clean);
                      if (json.apiKey) {
@@ -314,46 +313,8 @@ const LandingScreen: React.FC<{ onConfigSave: (config: FirebaseConfig) => void; 
                     ) : (
                         <div className="animate-fade-in">
                              <h2 className="text-xl font-bold text-white mb-2">{t('setupTitle')}</h2>
-                             <p className="text-gray-400 text-sm mb-4">{t('shareLinkInstructions')}</p>
-                             
-                             <div className="space-y-4">
-                                <textarea
-                                    className="w-full h-32 bg-gray-900 text-gray-200 p-3 rounded-lg border border-gray-600 font-mono text-xs"
-                                    placeholder={t('firebaseConfigPlaceholder')}
-                                    value={configStr}
-                                    onChange={(e) => setConfigStr(e.target.value)}
-                                />
-                                <input 
-                                    type="email"
-                                    className="w-full bg-gray-900 text-gray-200 p-3 rounded-lg border border-gray-600"
-                                    placeholder={t('adminEmailPlaceholder')}
-                                    value={adminEmail}
-                                    onChange={(e) => setAdminEmail(e.target.value)}
-                                />
-                                <input 
-                                    type="password"
-                                    className="w-full bg-gray-900 text-gray-200 p-3 rounded-lg border border-gray-600"
-                                    placeholder={t('passwordLabel')}
-                                    value={adminPassword}
-                                    onChange={(e) => setAdminPassword(e.target.value)}
-                                />
-                                <button
-                                    onClick={handleConfigSubmit}
-                                    disabled={loading}
-                                    className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50"
-                                >
-                                    {loading ? 'Thinking...' : t('saveConfigButton')}
-                                </button>
-                                {systemConfigured && (
-                                     <button
-                                        onClick={handleShare}
-                                        className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2"
-                                     >
-                                         <ShareIcon className="w-5 h-5" />
-                                         {t('shareLinkButton')}
-                                     </button>
-                                )}
-                             </div>
+                             <textarea className="w-full h-32 bg-gray-900 text-gray-200 p-3 rounded-lg border border-gray-600 font-mono text-xs" placeholder={t('firebaseConfigPlaceholder')} value={configStr} onChange={(e) => setConfigStr(e.target.value)} />
+                             <button onClick={handleConfigSubmit} className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg mt-4">{t('saveConfigButton')}</button>
                         </div>
                     )}
                 </div>
@@ -378,22 +339,6 @@ const PermissionErrorModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
         </div>
     </div>
 );
-
-
-const getClosestAspectRatio = (width: number, height: number): '1:1' | '16:9' | '9:16' | '4:3' | '3:4' => {
-    const ratio = width / height;
-    const targets = [
-        { r: 1, val: '1:1' as const },
-        { r: 16/9, val: '16:9' as const },
-        { r: 9/16, val: '9:16' as const },
-        { r: 4/3, val: '4:3' as const },
-        { r: 3/4, val: '3:4' as const }
-    ];
-    // Find closest
-    return targets.reduce((prev, curr) => 
-        Math.abs(curr.r - ratio) < Math.abs(prev.r - ratio) ? curr : prev
-    ).val;
-}
 
 const App: React.FC = () => {
   const [lang, setLang] = useState<Language>('zh');
@@ -422,11 +367,9 @@ const App: React.FC = () => {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [isPanMode, setIsPanMode] = useState(false);
-  const [isComparing, setIsComparing] = useState<boolean>(false);
   const [isLayoutEditorOpen, setIsLayoutEditorOpen] = useState(false);
   const [editingImage, setEditingImage] = useState<UploadedImage | null>(null);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
-  const [adminMsg, setAdminMsg] = useState('');
   const [showPermissionHelp, setShowPermissionHelp] = useState(false);
 
   const canvasRef = useRef<CanvasEditorRef>(null);
@@ -447,41 +390,40 @@ const App: React.FC = () => {
   useEffect(() => {
     const key = getActiveKey();
     if (!key) {
-        setShowApiKeyModal(true);
+        // Delay slightly to allow auth to settle if needed, but important for public sharing
+        setTimeout(() => setShowApiKeyModal(true), 1000);
     }
   }, []);
 
   const handleApiKeySave = (key: string) => {
       setStoredKey(key);
       setShowApiKeyModal(false);
-      // Force refresh of key in service if needed, though getActiveKey checks localStorage
+      setError(null);
   };
 
   const selectedImage = uploadedImages.find(img => img.id === selectedImageId) || null;
-
+  
   const fitImageToScreen = useCallback(() => {
-    if (!selectedImage) return;
-    setTimeout(() => {
+    if (!imageContainerRef.current || !selectedImage) return;
+    const img = new Image();
+    img.onload = () => {
+        if (!imageContainerRef.current) return;
         const container = imageContainerRef.current;
-        if (!container) return;
-        const img = new Image();
-        img.src = selectedImage.dataUrl;
-        img.onload = () => {
-             const padding = 20;
-             const w = container.clientWidth;
-             const h = container.clientHeight;
-             if (w === 0 || h === 0) return;
-             const scaleX = (w - padding) / img.naturalWidth;
-             const scaleY = (h - padding) / img.naturalHeight;
-             setZoom(Math.min(scaleX, scaleY)); 
-             setPan({ x: 0, y: 0 });
-        };
-    }, 50);
+        const containerWidth = container.clientWidth;
+        const containerHeight = container.clientHeight;
+        
+        // padding
+        const pW = containerWidth * 0.9;
+        const pH = containerHeight * 0.9;
+        
+        const scale = Math.min(pW / img.naturalWidth, pH / img.naturalHeight);
+        setZoom(scale);
+        setPan({ x: 0, y: 0 });
+    }
+    img.src = selectedImage.dataUrl;
   }, [selectedImage]);
 
   useEffect(() => { if (selectedImageId) fitImageToScreen(); }, [selectedImageId, fitImageToScreen]);
-  useEffect(() => { const handleResize = () => fitImageToScreen(); window.addEventListener('resize', handleResize); return () => window.removeEventListener('resize', handleResize); }, [fitImageToScreen]);
-  useEffect(() => { if (selectedImageId && !loading && !apiResult.imageUrl) fitImageToScreen(); }, [selectedImageId, loading, apiResult.imageUrl, fitImageToScreen]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -524,6 +466,20 @@ const App: React.FC = () => {
   const handleConfigSave = (config: FirebaseConfig) => { try { initializeFirebase(config); setFirebaseInitialized(true); } catch (e: any) { alert(e.message); } };
   const refreshUserProfile = async () => { if (userProfile) { try { const updated = await getUserProfile(userProfile.uid); setUserProfile(updated); } catch(e) {} } };
 
+  // Error Handling Wrapper
+  const handleApiError = (e: any) => {
+      console.error(e);
+      const msg = e.message || '';
+      if (msg.includes('API_KEY_INVALID') || msg.includes('API Key')) {
+          setError('API Key Invalid or Expired.');
+          setShowApiKeyModal(true);
+      } else if (msg.includes('permission-denied')) {
+          setShowPermissionHelp(true);
+      } else {
+          setError(msg);
+      }
+  };
+
   const handleRefinePrompt = async () => {
     if (!prompt) return;
     if (!userProfile || userProfile.credits < 1) { alert(t('notEnoughCredits')); return; }
@@ -546,9 +502,7 @@ const App: React.FC = () => {
             setPrompt(enhancedPrompt);
         }
     } catch (e: any) {
-         if (e.code === 'permission-denied') setShowPermissionHelp(true);
-         // Auto open key modal on key error
-         if (e.message.includes('API_KEY')) setShowApiKeyModal(true);
+         handleApiError(e);
     } finally { setIsRefining(false); }
   };
 
@@ -578,8 +532,8 @@ const App: React.FC = () => {
         if (canvasRef.current) { capturedCanvasData = canvasRef.current.toDataURL('image/png'); } 
         else { capturedCanvasData = selectedImage.dataUrl; }
     }
-
     const previousResultUrl = apiResult.imageUrl;
+
     setLoading(true);
     setError(null);
     setWarning(null);
@@ -587,7 +541,6 @@ const App: React.FC = () => {
 
     try {
       let effectiveAspectRatio: '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | null = null;
-      
       if (!selectedImage) {
           if (aspectRatio === '3:2') effectiveAspectRatio = '4:3';
           else if (aspectRatio === '2:3') effectiveAspectRatio = '3:4';
@@ -599,11 +552,6 @@ const App: React.FC = () => {
       if (!selectedImage) {
         const result = await generateImageWithGemini(prompt, effectiveAspectRatio);
         resultImageUrl = result.imageUrl;
-        if (resultImageUrl) {
-            await deductCredits(userProfile.uid, cost);
-            setUserProfile(prev => prev ? { ...prev, credits: prev.credits - cost } : null);
-            setApiResult({ text: null, imageUrl: resultImageUrl });
-        }
       } else {
         let baseImagePart: GeminiImagePart;
         if (previousResultUrl) {
@@ -616,7 +564,6 @@ const App: React.FC = () => {
         }
         
         const imagesToSend: GeminiImagePart[] = [baseImagePart];
-        
         const editPrefix = "Edit instruction: ";
         const finalPrompt = `${editPrefix}${prompt}\n\n${t('instructionalPrompt')}`;
         
@@ -628,25 +575,19 @@ const App: React.FC = () => {
           if (part?.inlineData) {
             resultImageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
           }
-        } else {
-          throw new Error('Invalid response structure from API.');
         }
+      }
 
-        if (resultImageUrl) {
-             await deductCredits(userProfile.uid, cost);
-             setUserProfile(prev => prev ? { ...prev, credits: prev.credits - cost } : null);
-             setApiResult({ text: null, imageUrl: resultImageUrl });
-        }
+      if (resultImageUrl) {
+            await deductCredits(userProfile.uid, cost);
+            setUserProfile(prev => prev ? { ...prev, credits: prev.credits - cost } : null);
+            setApiResult({ text: null, imageUrl: resultImageUrl });
+      } else {
+          throw new Error('No image generated.');
       }
+
     } catch (e: any) {
-      console.error(e);
-      const msg = e.message || '';
-      if (msg.includes('PERMISSION_DENIED') || msg.includes('403') || msg.includes('API_KEY') || msg.includes('API Key')) {
-          setError('API Permission Denied. Please set your API key.');
-          setShowApiKeyModal(true);
-      }
-      else if (msg.includes('RESOURCE_EXHAUSTED')) setError(t('rateLimitError'));
-      else setError(msg);
+      handleApiError(e);
       setApiResult({ text: null, imageUrl: previousResultUrl });
     } finally {
       setLoading(false);
@@ -654,111 +595,126 @@ const App: React.FC = () => {
   }, [selectedImage, prompt, uploadedImages, selectedImageId, t, apiResult.imageUrl, aspectRatio, userProfile]);
 
   const handleFiles = useCallback((files: FileList) => {
-    const filesArray = Array.from(files).filter(file => file.type.startsWith('image/'));
-    if (filesArray.length === 0) return;
-    const newImages: UploadedImage[] = [];
-    let loadedCount = 0;
-    filesArray.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        newImages.push({ id: `${file.name}-${Date.now()}`, file, dataUrl: event.target?.result as string });
-        loadedCount++;
-        if (loadedCount === filesArray.length) {
-          setUploadedImages(prev => [...prev, ...newImages]);
-          if (!selectedImageId && newImages.length > 0) setSelectedImageId(newImages[0].id);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+      const newImages: UploadedImage[] = [];
+      Array.from(files).forEach(file => {
+          if (file.type.startsWith('image/')) {
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                  if (e.target?.result) {
+                      const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+                      setUploadedImages(prev => [...prev, {
+                          id,
+                          file,
+                          dataUrl: e.target!.result as string
+                      }]);
+                      if (!selectedImageId) {
+                          setSelectedImageId(id);
+                      }
+                  }
+              };
+              reader.readAsDataURL(file);
+          }
+      });
   }, [selectedImageId]);
+  
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) { handleFiles(e.target.files); e.target.value = ''; } };
   const handleUploadClick = () => fileInputRef.current?.click();
   const handleImageSelect = (id: string) => { if(id !== selectedImageId) { setSelectedImageId(id); setApiResult({ text: null, imageUrl: null }); setError(null); setWarning(null); } }
+  
   const handleImageDelete = (id: string) => {
-    setUploadedImages(prev => prev.filter(img => img.id !== id));
-    if (selectedImageId === id) {
-        const remaining = uploadedImages.filter(img => img.id !== id);
-        setSelectedImageId(remaining.length > 0 ? remaining[0].id : null);
-        setApiResult({ text: null, imageUrl: null });
-        setError(null);
-        setWarning(null);
-    }
-  }
+      setUploadedImages(prev => prev.filter(img => img.id !== id));
+      if (selectedImageId === id) {
+          setSelectedImageId(null);
+          setApiResult({ text: null, imageUrl: null });
+      }
+  };
+  
   const handleImageReorder = (reorderedImages: UploadedImage[]) => setUploadedImages(reorderedImages);
   const handleClearResult = () => { setApiResult({ text: null, imageUrl: null }); setError(null); setWarning(null); };
   
+  // Pan Handlers
   const handlePanByControl = useCallback((dx: number, dy: number) => { setPan(p => ({ x: p.x + dx, y: p.y + dy })); }, []);
+  
   const handlePanStart = useCallback((clientX: number, clientY: number) => {
-    if (!imageContainerRef.current) return;
-    panStartRef.current = { startX: clientX, startY: clientY, startPan: pan };
+    panStartRef.current = { startX: clientX, startY: clientY, startPan: { ...pan } };
     setIsPanning(true);
   }, [pan]);
+
   const handlePanMove = useCallback((clientX: number, clientY: number) => {
     if (!isPanning) return;
-    setPan({ x: panStartRef.current.startPan.x + (clientX - panStartRef.current.startX), y: panStartRef.current.startPan.y + (clientY - panStartRef.current.startY) });
+    const dx = clientX - panStartRef.current.startX;
+    const dy = clientY - panStartRef.current.startY;
+    setPan({
+        x: panStartRef.current.startPan.x + dx,
+        y: panStartRef.current.startPan.y + dy
+    });
   }, [isPanning]);
+  
   const handlePanEnd = useCallback(() => setIsPanning(false), []);
   const resetView = useCallback(() => { fitImageToScreen(); }, [fitImageToScreen]);
   const onMouseDown = (e: React.MouseEvent) => { if (e.button !== 0) return; e.preventDefault(); handlePanStart(e.clientX, e.clientY); };
   const onMouseMove = (e: React.MouseEvent) => { e.preventDefault(); handlePanMove(e.clientX, e.clientY); };
+
   const onTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
-      setIsPanning(false);
-      const t1 = e.touches[0]; const t2 = e.touches[1];
-      pinchStartRef.current = { dist: Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY), mid: { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 }, zoom: zoom, pan: pan };
-    } else if (e.touches.length === 1) { pinchStartRef.current = null; handlePanStart(e.touches[0].clientX, e.touches[0].clientY); }
+        setIsPanning(false);
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        pinchStartRef.current = {
+            dist: Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY),
+            mid: { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 },
+            zoom: zoom,
+            pan: pan,
+        };
+    } else if (e.touches.length === 1) {
+        handlePanStart(e.touches[0].clientX, e.touches[0].clientY);
+    }
   };
+
   const onTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length === 2 && pinchStartRef.current) {
       e.preventDefault();
-      const t1 = e.touches[0]; const t2 = e.touches[1];
-      const newDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-      const scale = newDist / pinchStartRef.current.dist;
-      const newZoom = Math.max(0.1, Math.min(10, pinchStartRef.current.zoom * scale));
-      if (imageContainerRef.current) {
-          const rect = imageContainerRef.current.getBoundingClientRect();
-          const startMidOnScreen = { x: pinchStartRef.current.mid.x - rect.left, y: pinchStartRef.current.mid.y - rect.top };
-          const worldPoint = { x: (startMidOnScreen.x - pinchStartRef.current.pan.x) / pinchStartRef.current.zoom, y: (startMidOnScreen.y - pinchStartRef.current.pan.y) / pinchStartRef.current.zoom };
-          const newMid = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
-          const newMidOnScreen = { x: newMid.x - rect.left, y: newMid.y - rect.top };
-          const newPan = { x: newMidOnScreen.x - worldPoint.x * newZoom, y: newMidOnScreen.y - worldPoint.y * newZoom };
-          setZoom(newZoom); setPan(newPan);
+      if (e.touches.length === 2 && pinchStartRef.current) {
+          const t1 = e.touches[0];
+          const t2 = e.touches[1];
+          const newDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+          const scale = newDist / pinchStartRef.current.dist;
+          const newZoom = Math.max(0.1, Math.min(10, pinchStartRef.current.zoom * scale));
+          
+          setZoom(newZoom);
+      } else if (e.touches.length === 1) {
+          handlePanMove(e.touches[0].clientX, e.touches[0].clientY);
       }
-    } else if (e.touches.length === 1 && isPanning) { handlePanMove(e.touches[0].clientX, e.touches[0].clientY); }
   };
-  const onTouchEnd = (e: React.TouchEvent) => { handlePanEnd(); if (e.touches.length < 2) pinchStartRef.current = null; if (e.touches.length === 1) handlePanStart(e.touches[0].clientX, e.touches[0].clientY); };
+
+  const onTouchEnd = () => {
+      pinchStartRef.current = null;
+      handlePanEnd();
+  };
 
   const handleEditResult = () => {
-    if (!apiResult.imageUrl) return;
-    try {
-      const dataUrl = apiResult.imageUrl;
-      const parts = dataUrl.split(',');
-      const mimeString = parts[0].split(':')[1].split(';')[0];
-      const extension = mimeString.split('/')[1] || 'png';
-      const byteString = atob(parts[1]);
-      const arrayBuffer = new ArrayBuffer(byteString.length);
-      const intArray = new Uint8Array(arrayBuffer);
-      for (let i = 0; i < byteString.length; i++) intArray[i] = byteString.charCodeAt(i);
-      const blob = new Blob([arrayBuffer], { type: mimeString });
-      const filename = `result-${Date.now()}.${extension}`;
-      const file = new File([blob], filename, { type: mimeString });
-      const newImage: UploadedImage = { id: `${file.name}-${Date.now()}`, file, dataUrl: dataUrl };
-      setUploadedImages(prev => [...prev, newImage]);
-      setSelectedImageId(newImage.id);
-      setApiResult({ text: null, imageUrl: null });
-      setError(null);
-      setWarning(null);
-    } catch (e) { console.error(e); setError("Could not load result image."); }
+    if (apiResult.imageUrl) {
+        const newImage: UploadedImage = {
+            id: `edited-${Date.now()}`,
+            file: new File([], "edited_image.png"), 
+            dataUrl: apiResult.imageUrl
+        };
+        setUploadedImages(prev => [...prev, newImage]);
+        setSelectedImageId(newImage.id);
+        setApiResult({ text: null, imageUrl: null });
+    }
   };
-
+  
   const handleLayoutComplete = (dataUrl: string) => {
-      const mime = dataUrl.match(/:(.*?);/)?.[1] || 'image/png';
-      const file = new File([new Blob([new Uint8Array(0)])], `layout-${Date.now()}`, { type: mime });
-      const newImage = { id: `${Date.now()}`, file, dataUrl };
+      const newImage: UploadedImage = {
+          id: `layout-${Date.now()}`,
+          file: new File([], "layout.png"),
+          dataUrl: dataUrl
+      };
       setUploadedImages(prev => [...prev, newImage]);
       setSelectedImageId(newImage.id);
       setIsLayoutEditorOpen(false);
   }
+  
   const handleOpenPhotoEditor = (id: string) => { const img = uploadedImages.find(i => i.id === id); if (img) setEditingImage(img); };
   const handleSavePhotoEditor = (id: string, dataUrl: string) => { setUploadedImages(prev => prev.map(img => img.id === id ? { ...img, dataUrl } : img)); setEditingImage(null); };
 
@@ -778,7 +734,7 @@ const App: React.FC = () => {
       )}
       {showVideoPromptModal && selectedImage && <VideoPromptModal imageSrc={selectedImage.dataUrl} onClose={() => setShowVideoPromptModal(false)} t={t} lang={lang} />}
       {showPermissionHelp && <PermissionErrorModal onClose={() => setShowPermissionHelp(false)} />}
-      {/* LayoutEditor kept for backward compat but button hidden, can be removed if cleanup desired */}
+      
       {isLayoutEditorOpen && <LayoutEditor onComplete={handleLayoutComplete} onClose={() => setIsLayoutEditorOpen(false)} t={t} />}
       {editingImage && (
         <PhotoEditor 
@@ -797,7 +753,7 @@ const App: React.FC = () => {
                 <h1 className="text-4xl lg:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">
                     {t('title')} 
                     <span className="text-xs bg-green-900 text-green-200 px-2 py-1 rounded border border-green-700 align-middle ml-2 font-bold shadow-sm">
-                        Gemini 2.5 (v2025.12.05 FIXED)
+                        Gemini 2.5 (Public/BYOK)
                     </span>
                 </h1>
                 <p className="text-gray-400 mt-2">{t('subtitle')}</p>
@@ -816,10 +772,10 @@ const App: React.FC = () => {
                 <div className="flex gap-2 border-l border-gray-600 pl-4 items-center">
                     <button 
                         onClick={() => setShowApiKeyModal(true)} 
-                        className="text-gray-400 hover:text-white p-1 rounded" 
+                        className="text-yellow-400 hover:text-white p-1 rounded animate-pulse" 
                         title="Change API Key"
                     >
-                        <KeyIcon className="w-4 h-4" />
+                        <KeyIcon className="w-5 h-5" />
                     </button>
                     <button onClick={() => setLang('en')} className={`px-2 py-1 text-xs rounded-md ${lang === 'en' ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}>EN</button>
                     <button onClick={() => setLang('zh')} className={`px-2 py-1 text-xs rounded-md ${lang === 'zh' ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}>中文</button>
@@ -827,7 +783,6 @@ const App: React.FC = () => {
             </div>
         </header>
 
-        {/* Admin Panel */}
         {userProfile?.isAdmin && (
             <div className="mb-6 bg-blue-900/20 border border-blue-500/30 p-4 rounded-lg">
                 <div className="flex justify-between items-center cursor-pointer" onClick={() => setIsAdminPanelOpen(!isAdminPanelOpen)}>
@@ -843,7 +798,6 @@ const App: React.FC = () => {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column */}
           <div className="flex flex-col gap-4 bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700">
              <div className="flex flex-wrap justify-between items-center gap-2">
               <div className="flex items-center gap-4">
@@ -879,7 +833,6 @@ const App: React.FC = () => {
                     originalImageSrc={selectedImage?.dataUrl || null}
                  />
             ) : (
-                // Canvas View
                  <div className={`relative w-full aspect-[4/3] bg-gray-900 rounded-lg overflow-hidden border-2 border-dashed border-gray-700 group ${isPanMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}>
                     <div 
                         ref={imageContainerRef}
@@ -891,7 +844,6 @@ const App: React.FC = () => {
                         onTouchStart={onTouchStart}
                         onTouchMove={onTouchMove}
                         onTouchEnd={onTouchEnd}
-                        // Removed onWheel to prevent zooming via mouse wheel
                     >
                     {!selectedImage ? (
                         <div className="flex flex-col items-center text-gray-500 cursor-pointer hover:text-gray-400 transition-colors" onClick={handleUploadClick}>
@@ -922,7 +874,6 @@ const App: React.FC = () => {
                 </div>
             )}
 
-            {/* Toolbar for Canvas */}
             {!apiResult.imageUrl && (
                 <Toolbar
                     brushSize={brushSize}
@@ -934,7 +885,6 @@ const App: React.FC = () => {
                 />
             )}
             
-            {/* Thumbnails */}
             <ThumbnailManager
                 images={uploadedImages}
                 selectedImageId={selectedImageId}
@@ -948,7 +898,6 @@ const App: React.FC = () => {
             />
           </div>
 
-          {/* Right Column */}
           <div className="flex flex-col gap-6">
             <div className="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700 flex flex-col gap-4">
                  <div className="flex justify-between items-center">
@@ -1060,10 +1009,10 @@ const App: React.FC = () => {
                     <span className="text-xl">⚠️</span> {t('errorTitle')}
                   </p>
                   <p className="mt-1">{error}</p>
-                   {error === 'PERMISSION_DENIED_UI' && (
-                        <p className="mt-2 text-xs text-red-300">
-                             Tip: Check your API Key permissions or quota.
-                        </p>
+                   {error.includes('Key') && (
+                        <button onClick={() => setShowApiKeyModal(true)} className="mt-2 text-xs bg-red-700 hover:bg-red-600 px-2 py-1 rounded text-white underline">
+                             Update API Key
+                        </button>
                    )}
                 </div>
               )}
