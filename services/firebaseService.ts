@@ -20,6 +20,8 @@ import {
     where, 
     getDocs 
 } from 'firebase/firestore';
+// Import App Check
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import type { FirebaseConfig, UserProfile } from '../types';
 import { embeddedConfig } from '../lib/firebaseConfig';
 
@@ -85,6 +87,25 @@ export const initializeFirebase = (config?: FirebaseConfig) => {
 
     if (!getApps().length) {
         app = initializeApp(finalConfig as any);
+        
+        // --- SECURITY IMPROVEMENT: APP CHECK ---
+        // 注意：要啟用此功能，您需要在 Firebase Console 註冊您的網站，
+        // 並取得 ReCAPTCHA v3 site key。
+        // 當您準備好後，取消下方的註解並填入您的 Site Key。
+        /*
+        if (typeof window !== 'undefined') {
+            try {
+                // const appCheck = initializeAppCheck(app, {
+                //     provider: new ReCaptchaV3Provider('YOUR_RECAPTCHA_V3_SITE_KEY'),
+                //     isTokenAutoRefreshEnabled: true
+                // });
+                // console.log("Firebase App Check initialized.");
+            } catch (e) {
+                console.warn("App Check initialization failed:", e);
+            }
+        }
+        */
+        
     } else {
         app = getApp();
     }

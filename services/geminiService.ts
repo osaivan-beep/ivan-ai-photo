@@ -3,19 +3,24 @@ import { GoogleGenAI, Modality, type GenerateContentResponse } from '@google/gen
 import type { GeminiImagePart, ImageResolution } from '../types';
 
 // Dynamic retrieval function
-const getActiveKey = (): string => {
-    // 從環境變數讀取 Key (由 vite.config.ts 注入)
-    const key = process.env.API_KEY || "";
+export const getActiveKey = (): string => {
+    // 1. Try Local Storage (User provided key - BYOK) - 這是最安全的做法
+    const localKey = localStorage.getItem('gemini_api_key');
+    if (localKey && localKey.length > 10) return localKey;
+
+    // 2. Try Environment Variable (System provided key)
+    // 僅當開發者有設定且沒有被使用者覆蓋時使用
+    const envKey = process.env.API_KEY || "";
     
-    // DEBUG: 在瀏覽器 Console 顯示狀態，幫助除錯
-    if (!key) {
-        console.error("❌ Gemini Service: API Key is MISSING! Please check GitHub Secrets.");
-    } else {
-        // 只顯示前 5 碼確認是否為新 Key，確保安全
-        console.log(`🔑 Gemini Service: API Key loaded. Starts with: ${key.substring(0, 5)}...`);
-    }
-    
-    return key;
+    return envKey;
+};
+
+export const setStoredKey = (key: string) => {
+    localStorage.setItem('gemini_api_key', key);
+};
+
+export const removeStoredKey = () => {
+    localStorage.removeItem('gemini_api_key');
 };
 
 const handleGeminiError = (error: unknown, context: string): never => {
@@ -26,8 +31,12 @@ const handleGeminiError = (error: unknown, context: string): never => {
       throw new Error('額度已滿，請稍後再試 (Rate Limit Exceeded)');
     }
     // 特別針對 Key 被封鎖或權限錯誤的提示
-    if (msg.includes('PERMISSION_DENIED') || msg.includes('403') || msg.includes('API key was reported as leaked')) {
-      throw new Error('API Key 無效或被封鎖 (Key Leaked/Invalid)。請更換新的 API Key 並更新 GitHub Secrets。');
+    // 加入特定關鍵字 "API_KEY_INVALID" 讓前端 App.tsx 可以偵測並彈出視窗
+    if (msg.includes('PERMISSION_DENIED') || msg.includes('403') || msg.includes('API key was reported as leaked') || msg.includes('key not found')) {
+      if (localStorage.getItem('gemini_api_key')) {
+          throw new Error('API_KEY_INVALID: 您的 API Key 無效或權限不足。請重新輸入。');
+      }
+      throw new Error('API_KEY_INVALID: 系統 API Key 無效或被封鎖。請點擊左下角鑰匙圖示輸入您自己的 Key。');
     }
     throw new Error(`${context} Error: ${msg}`);
   }
@@ -41,7 +50,7 @@ export const generateImageWithGemini = async (
   
   const apiKey = getActiveKey();
   // 如果沒有 Key，直接拋出清楚的錯誤
-  if (!apiKey) throw new Error("系統未偵測到 API Key。請管理員檢查 GitHub Secrets 設定。");
+  if (!apiKey) throw new Error("API_KEY_MISSING: 尚未設定 API Key。請點擊左下角鑰匙圖示輸入。");
 
   const ai = new GoogleGenAI({ apiKey });
   
@@ -85,7 +94,7 @@ export const editImageWithGemini = async (
   prompt: string
 ): Promise<{ response: GenerateContentResponse }> => {
   const apiKey = getActiveKey();
-  if (!apiKey) throw new Error("API Key is missing.");
+  if (!apiKey) throw new Error("API_KEY_MISSING: 尚未設定 API Key。");
 
   const ai = new GoogleGenAI({ apiKey });
 
@@ -143,8 +152,9 @@ export const refinePrompt = async (
       config: { systemInstruction: systemInstruction, temperature: 0.7 }
     });
     return response.text?.trim() || prompt;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error calling Gemini API for refinement:", error);
+    if (error.message?.includes('API_KEY')) throw error;
     return prompt; 
   }
 };
@@ -203,7 +213,7 @@ export const generatePoeticText = async (
     imagePart?: GeminiImagePart
 ): Promise<string> => {
     const apiKey = getActiveKey();
-    if (!apiKey) return "Error: API Key missing.";
+    if (!apiKey) throw new Error("API_KEY_MISSING: 尚未設定 API Key。");
 
     const ai = new GoogleGenAI({ apiKey });
 
@@ -284,8 +294,9 @@ export const generatePoeticText = async (
 
         return result;
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Poetic generation failed:", error);
+        if (error.message?.includes('API_KEY')) throw error;
         return "生成錯誤，請檢查網路 (Generation Error)"; 
     }
 };
