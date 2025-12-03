@@ -1,3 +1,4 @@
+
 import type { FirebaseConfig } from '../types';
 
 /**
