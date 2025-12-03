@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { GenerateContentResponse } from '@google/genai';
 import { CanvasEditor, type CanvasEditorRef } from './components/CanvasEditor';
@@ -6,7 +7,7 @@ import { QuickPrompts } from './components/QuickPrompts';
 import { Toolbar } from './components/Toolbar';
 import { ThumbnailManager } from './components/ThumbnailManager';
 import { ResultDisplay } from './components/ResultDisplay';
-import { UploadIcon, SparklesIcon, RedrawIcon, ZoomInIcon, ZoomOutIcon, ArrowsPointingOutIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, UserCircleIcon, ShareIcon, CloseIcon, HandIcon, KeyIcon, VideoCameraIcon } from './components/Icons';
+import { UploadIcon, SparklesIcon, RedrawIcon, ZoomInIcon, ZoomOutIcon, ArrowsPointingOutIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, UserCircleIcon, ShareIcon, CloseIcon, HandIcon, KeyIcon, VideoCameraIcon, RefreshIcon } from './components/Icons';
 import { editImageWithGemini, generateImageWithGemini, refinePrompt, getActiveKey, setStoredKey, removeStoredKey } from './services/geminiService';
 import type { ApiResult, Language, UploadedImage, GeminiImagePart, TFunction, ImageResolution, UserProfile, FirebaseConfig } from './types';
 import { translations } from './lib/translations';
@@ -1009,14 +1010,25 @@ const App: React.FC = () => {
 
               {error && (
                 <div className="p-4 bg-red-900/30 border border-red-500/50 rounded-xl text-red-200 text-sm">
-                  <p className="font-bold flex items-center gap-2">
-                    <span className="text-xl">⚠️</span> {t('errorTitle')}
-                  </p>
-                  <p className="mt-1">{error}</p>
+                  <div className="flex justify-between items-start">
+                      <div>
+                          <p className="font-bold flex items-center gap-2">
+                            <span className="text-xl">⚠️</span> {t('errorTitle')}
+                          </p>
+                          <p className="mt-1 whitespace-pre-wrap">{error}</p>
+                      </div>
+                      <button onClick={() => setError(null)} className="text-red-400 hover:text-white"><CloseIcon className="w-5 h-5"/></button>
+                  </div>
                    {error.includes('Key') && (
                         <button onClick={() => setShowApiKeyModal(true)} className="mt-2 text-xs bg-red-700 hover:bg-red-600 px-2 py-1 rounded text-white underline">
                              Update API Key
                         </button>
+                   )}
+                   {/* Rate Limit Retry Button */}
+                   {error.includes('Rate Limit') && (
+                       <button onClick={handleGenerate} className="mt-2 flex items-center gap-1 text-xs bg-red-700 hover:bg-red-600 px-3 py-1.5 rounded text-white font-bold transition-colors">
+                           <RefreshIcon className="w-3 h-3" /> Retry / 重試
+                       </button>
                    )}
                 </div>
               )}
