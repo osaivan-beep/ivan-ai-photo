@@ -1,5 +1,3 @@
-
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { GenerateContentResponse } from '@google/genai';
 import { CanvasEditor, type CanvasEditorRef } from './components/CanvasEditor';
@@ -7,7 +5,7 @@ import { QuickPrompts } from './components/QuickPrompts';
 import { Toolbar } from './components/Toolbar';
 import { ThumbnailManager } from './components/ThumbnailManager';
 import { ResultDisplay } from './components/ResultDisplay';
-import { UploadIcon, SparklesIcon, RedrawIcon, ZoomInIcon, ZoomOutIcon, ArrowsPointingOutIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, UserCircleIcon, ShareIcon, CloseIcon, HandIcon, KeyIcon, VideoCameraIcon } from './components/Icons';
+import { UploadIcon, SparklesIcon, RedrawIcon, ZoomInIcon, ZoomOutIcon, ArrowsPointingOutIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, UserCircleIcon, ShareIcon, CloseIcon, HandIcon, VideoCameraIcon } from './components/Icons';
 import { editImageWithGemini, generateImageWithGemini, refinePrompt } from './services/geminiService';
 import type { ApiResult, Language, UploadedImage, GeminiImagePart, TFunction, ImageResolution, UserProfile, FirebaseConfig } from './types';
 import { translations } from './lib/translations';
@@ -410,7 +408,6 @@ const App: React.FC = () => {
   const [prompt, setPrompt] = useState<string>('');
   const [aspectRatio, setAspectRatio] = useState<string>('3:2');
   const [resolution, setResolution] = useState<ImageResolution>('2K');
-  const [useProModel, setUseProModel] = useState<boolean>(false);
   const [allQuickPrompts, setAllQuickPrompts] = useState<Record<string, string[]>>({});
   const [apiResult, setApiResult] = useState<ApiResult>({ text: null, imageUrl: null });
   const [loading, setLoading] = useState<boolean>(false);
@@ -553,7 +550,7 @@ const App: React.FC = () => {
   };
 
   const handleGenerate = useCallback(async () => {
-    const cost = useProModel ? 6 : 3;
+    const cost = 3;
     if (!prompt) { setError('Please enter a prompt.'); return; }
     if (!userProfile || userProfile.credits < cost) { setError(t('notEnoughCredits')); return; }
 
@@ -581,7 +578,7 @@ const App: React.FC = () => {
       let resultImageUrl = '';
 
       if (!selectedImage) {
-        const result = await generateImageWithGemini(prompt, effectiveAspectRatio, useProModel, resolution);
+        const result = await generateImageWithGemini(prompt, effectiveAspectRatio);
         resultImageUrl = result.imageUrl;
         if (resultImageUrl) {
             await deductCredits(userProfile.uid, cost);
@@ -604,7 +601,7 @@ const App: React.FC = () => {
         const editPrefix = "Edit instruction: ";
         const finalPrompt = `${editPrefix}${prompt}\n\n${t('instructionalPrompt')}`;
         
-        const result = await editImageWithGemini(imagesToSend, finalPrompt, useProModel);
+        const result = await editImageWithGemini(imagesToSend, finalPrompt);
         const response = result.response;
 
         if (response.candidates && response.candidates[0]?.content?.parts) {
@@ -632,7 +629,7 @@ const App: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedImage, prompt, uploadedImages, selectedImageId, t, apiResult.imageUrl, aspectRatio, userProfile, useProModel, resolution]);
+  }, [selectedImage, prompt, uploadedImages, selectedImageId, t, apiResult.imageUrl, aspectRatio, userProfile]);
 
   const handleFiles = useCallback((files: FileList) => {
     const filesArray = Array.from(files).filter(file => file.type.startsWith('image/'));
@@ -777,7 +774,7 @@ const App: React.FC = () => {
                 <h1 className="text-4xl lg:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">
                     {t('title')} 
                     <span className="text-xs bg-gray-800 text-gray-400 px-2 py-1 rounded border border-gray-600 align-middle ml-2">
-                        Gemini 2.5 (v2025.12.04)
+                        Gemini 2.5 (v2025.12.01)
                     </span>
                 </h1>
                 <p className="text-gray-400 mt-2">{t('subtitle')}</p>
@@ -969,55 +966,27 @@ const App: React.FC = () => {
                    </p>
               )}
 
-              <div className="flex flex-col gap-4 bg-gray-900/50 p-3 rounded-lg border border-gray-700/50">
-                  <div className="flex items-center gap-2">
-                      <input 
-                        type="checkbox" 
-                        id="useProModel" 
-                        checked={useProModel} 
-                        onChange={(e) => setUseProModel(e.target.checked)}
-                        className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-600 focus:ring-2"
-                      />
-                      <label htmlFor="useProModel" className="text-sm font-medium text-gray-300 cursor-pointer select-none">
-                          {t('highQualityLabel')}
-                      </label>
-                      <span className="text-xs text-yellow-500 font-bold ml-auto">
-                           {useProModel ? t('costPro') : t('cost1K')}
-                      </span>
+              <div className="grid grid-cols-1 gap-4">
+                  <div>
+                      <label className="block text-xs font-medium text-gray-400 mb-1">{t('aspectRatioLabel')}</label>
+                      <select
+                        value={aspectRatio}
+                        onChange={(e) => setAspectRatio(e.target.value)}
+                        className="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-purple-500 focus:border-purple-500 block p-2.5"
+                      >
+                         <option value="1:1">{t('ratio11')}</option>
+                         <option value="3:2">{t('ratio32')}</option>
+                         <option value="4:3">{t('ratio43')}</option>
+                         <option value="16:9">{t('ratio169')}</option>
+                         <option value="2:3">{t('ratio23')}</option>
+                         <option value="3:4">{t('ratio34')}</option>
+                         <option value="9:16">{t('ratio916')}</option>
+                      </select>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                      <div>
-                          <label className="block text-xs font-medium text-gray-400 mb-1">{t('aspectRatioLabel')}</label>
-                          <select
-                            value={aspectRatio}
-                            onChange={(e) => setAspectRatio(e.target.value)}
-                            className="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-purple-500 focus:border-purple-500 block p-2.5"
-                          >
-                             <option value="1:1">{t('ratio11')}</option>
-                             <option value="3:2">{t('ratio32')}</option>
-                             <option value="4:3">{t('ratio43')}</option>
-                             <option value="16:9">{t('ratio169')}</option>
-                             <option value="2:3">{t('ratio23')}</option>
-                             <option value="3:4">{t('ratio34')}</option>
-                             <option value="9:16">{t('ratio916')}</option>
-                          </select>
-                      </div>
-                      
-                      {useProModel && (
-                          <div className="animate-fade-in">
-                              <label className="block text-xs font-medium text-gray-400 mb-1">{t('resolutionSelectLabel')}</label>
-                              <select
-                                value={resolution}
-                                onChange={(e) => setResolution(e.target.value as ImageResolution)}
-                                className="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-purple-500 focus:border-purple-500 block p-2.5"
-                              >
-                                 <option value="1K">1K</option>
-                                 <option value="2K">2K</option>
-                                 <option value="4K">4K</option>
-                              </select>
-                          </div>
-                      )}
+                  <div className="text-right mt-1">
+                       <span className="text-xs text-yellow-500 font-bold">
+                           {t('cost1K')}
+                       </span>
                   </div>
               </div>
 
