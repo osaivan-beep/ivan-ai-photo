@@ -9,7 +9,8 @@ export const getActiveKey = (): string => {
     if (localKey && localKey.length > 10) return localKey;
 
     // 2. Try Environment Variable (System provided key)
-    // 僅當開發者有設定且沒有被使用者覆蓋時使用
+    // 僅當開發者有設定且沒有被使用者覆蓋時使用。
+    // 在正式營運時，建議此處回傳空字串，強制使用者輸入自己的 Key，以免您的額度被盜用。
     const envKey = process.env.API_KEY || "";
     
     return envKey;
@@ -27,17 +28,18 @@ const handleGeminiError = (error: unknown, context: string): never => {
   console.error(`Error calling ${context}:`, error);
   if (error instanceof Error) {
     const msg = error.message;
+    
+    // 偵測額度不足
     if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')) {
-      throw new Error('額度已滿，請稍後再試 (Rate Limit Exceeded)');
+      throw new Error('API 額度已滿 (Rate Limit Exceeded)。請稍後再試，或更換 API Key。');
     }
-    // 特別針對 Key 被封鎖或權限錯誤的提示
-    // 加入特定關鍵字 "API_KEY_INVALID" 讓前端 App.tsx 可以偵測並彈出視窗
-    if (msg.includes('PERMISSION_DENIED') || msg.includes('403') || msg.includes('API key was reported as leaked') || msg.includes('key not found')) {
-      if (localStorage.getItem('gemini_api_key')) {
-          throw new Error('API_KEY_INVALID: 您的 API Key 無效或權限不足。請重新輸入。');
-      }
-      throw new Error('API_KEY_INVALID: 系統 API Key 無效或被封鎖。請點擊左下角鑰匙圖示輸入您自己的 Key。');
+    
+    // 偵測 Key 無效或權限錯誤
+    if (msg.includes('PERMISSION_DENIED') || msg.includes('403') || msg.includes('API key not valid') || msg.includes('API_KEY_INVALID')) {
+        // 拋出特定錯誤字串，讓前端 App.tsx 可以偵測並彈出視窗
+        throw new Error('API_KEY_INVALID');
     }
+    
     throw new Error(`${context} Error: ${msg}`);
   }
   throw new Error(`An unknown error occurred while communicating with the ${context}.`);
@@ -49,8 +51,8 @@ export const generateImageWithGemini = async (
 ): Promise<{ imageUrl: string }> => {
   
   const apiKey = getActiveKey();
-  // 如果沒有 Key，直接拋出清楚的錯誤
-  if (!apiKey) throw new Error("API_KEY_MISSING: 尚未設定 API Key。請點擊左下角鑰匙圖示輸入。");
+  // 如果沒有 Key，直接拋出錯誤觸發 UI
+  if (!apiKey) throw new Error("API_KEY_INVALID");
 
   const ai = new GoogleGenAI({ apiKey });
   
@@ -94,7 +96,7 @@ export const editImageWithGemini = async (
   prompt: string
 ): Promise<{ response: GenerateContentResponse }> => {
   const apiKey = getActiveKey();
-  if (!apiKey) throw new Error("API_KEY_MISSING: 尚未設定 API Key。");
+  if (!apiKey) throw new Error("API_KEY_INVALID");
 
   const ai = new GoogleGenAI({ apiKey });
 
@@ -122,7 +124,7 @@ export const refinePrompt = async (
     language: string = 'en'
 ): Promise<string> => {
   const apiKey = getActiveKey();
-  if (!apiKey) return prompt; 
+  if (!apiKey) return prompt; // 若無 Key，不優化直接回傳原提示詞，避免報錯阻擋流程
 
   const ai = new GoogleGenAI({ apiKey });
   try {
@@ -153,8 +155,8 @@ export const refinePrompt = async (
     });
     return response.text?.trim() || prompt;
   } catch (error: any) {
-    console.error("Error calling Gemini API for refinement:", error);
-    if (error.message?.includes('API_KEY')) throw error;
+    console.error("Refine Prompt Error:", error);
+    if (error.message?.includes('API_KEY_INVALID')) throw error;
     return prompt; 
   }
 };
@@ -175,7 +177,7 @@ export const generateWatermark = async (params: WatermarkParams): Promise<string
 // NEW: Video Prompt Generation
 export const generateVideoPrompt = async (image: GeminiImagePart, language: string = 'en'): Promise<string> => {
     const apiKey = getActiveKey();
-    if (!apiKey) return "Error: API Key missing.";
+    if (!apiKey) throw new Error("API_KEY_INVALID");
 
     const ai = new GoogleGenAI({ apiKey });
 
@@ -200,9 +202,8 @@ export const generateVideoPrompt = async (image: GeminiImagePart, language: stri
             config: { systemInstruction: systemInstruction, temperature: 0.5 }
         });
         return response.text?.trim() || "Failed to generate prompt.";
-    } catch (error) {
-        console.error("Error generating video prompt:", error);
-        return "Error generating video prompt.";
+    } catch (error: any) {
+        handleGeminiError(error, "Gemini Video Prompt");
     }
 };
 
@@ -213,7 +214,7 @@ export const generatePoeticText = async (
     imagePart?: GeminiImagePart
 ): Promise<string> => {
     const apiKey = getActiveKey();
-    if (!apiKey) throw new Error("API_KEY_MISSING: 尚未設定 API Key。");
+    if (!apiKey) throw new Error("API_KEY_INVALID");
 
     const ai = new GoogleGenAI({ apiKey });
 
@@ -295,8 +296,6 @@ export const generatePoeticText = async (
         return result;
 
     } catch (error: any) {
-        console.error("Poetic generation failed:", error);
-        if (error.message?.includes('API_KEY')) throw error;
-        return "生成錯誤，請檢查網路 (Generation Error)"; 
+        handleGeminiError(error, "Gemini Poem Gen");
     }
 };
