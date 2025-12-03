@@ -7,7 +7,7 @@ import { Toolbar } from './components/Toolbar';
 import { ThumbnailManager } from './components/ThumbnailManager';
 import { ResultDisplay } from './components/ResultDisplay';
 import { UploadIcon, SparklesIcon, RedrawIcon, ZoomInIcon, ZoomOutIcon, ArrowsPointingOutIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, UserCircleIcon, ShareIcon, CloseIcon, HandIcon, KeyIcon, VideoCameraIcon } from './components/Icons';
-import { editImageWithGemini, generateImageWithGemini, refinePrompt } from './services/geminiService';
+import { editImageWithGemini, generateImageWithGemini, refinePrompt, getActiveKey, setStoredKey, removeStoredKey } from './services/geminiService';
 import type { ApiResult, Language, UploadedImage, GeminiImagePart, TFunction, ImageResolution, UserProfile, FirebaseConfig } from './types';
 import { translations } from './lib/translations';
 import { PhotoEditor } from './components/PhotoEditor';
@@ -18,6 +18,7 @@ import { AdminUserList } from './components/AdminUserList';
 import { embeddedConfig } from './lib/firebaseConfig';
 import { WatermarkModal } from './components/WatermarkModal';
 import { VideoPromptModal } from './components/VideoPromptModal';
+import { ApiKeyWelcomeModal } from './components/ApiKeyWelcomeModal';
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -401,6 +402,7 @@ const App: React.FC = () => {
   const [firebaseInitialized, setFirebaseInitialized] = useState(false);
   const [showWatermarkModal, setShowWatermarkModal] = useState(false);
   const [showVideoPromptModal, setShowVideoPromptModal] = useState(false);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
@@ -440,6 +442,20 @@ const App: React.FC = () => {
   useEffect(() => {
     setAllQuickPrompts(translations[lang].defaultQuickPrompts);
   }, [lang]);
+
+  // Check for API Key on load
+  useEffect(() => {
+    const key = getActiveKey();
+    if (!key) {
+        setShowApiKeyModal(true);
+    }
+  }, []);
+
+  const handleApiKeySave = (key: string) => {
+      setStoredKey(key);
+      setShowApiKeyModal(false);
+      // Force refresh of key in service if needed, though getActiveKey checks localStorage
+  };
 
   const selectedImage = uploadedImages.find(img => img.id === selectedImageId) || null;
 
@@ -531,6 +547,8 @@ const App: React.FC = () => {
         }
     } catch (e: any) {
          if (e.code === 'permission-denied') setShowPermissionHelp(true);
+         // Auto open key modal on key error
+         if (e.message.includes('API_KEY')) setShowApiKeyModal(true);
     } finally { setIsRefining(false); }
   };
 
@@ -623,7 +641,10 @@ const App: React.FC = () => {
     } catch (e: any) {
       console.error(e);
       const msg = e.message || '';
-      if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) setError('API Permission Denied. Please check your custom API key.');
+      if (msg.includes('PERMISSION_DENIED') || msg.includes('403') || msg.includes('API_KEY') || msg.includes('API Key')) {
+          setError('API Permission Denied. Please set your API key.');
+          setShowApiKeyModal(true);
+      }
       else if (msg.includes('RESOURCE_EXHAUSTED')) setError(t('rateLimitError'));
       else setError(msg);
       setApiResult({ text: null, imageUrl: previousResultUrl });
@@ -745,6 +766,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 font-sans relative">
+      {showApiKeyModal && <ApiKeyWelcomeModal onSave={handleApiKeySave} t={t} />}
       {showWatermarkModal && (
         <WatermarkModal 
             onClose={() => setShowWatermarkModal(false)} 
@@ -791,7 +813,14 @@ const App: React.FC = () => {
                 <button onClick={() => logout()} className="text-xs bg-red-900/50 hover:bg-red-900 text-red-200 px-2 py-1 rounded">
                     {t('logoutButton')}
                 </button>
-                <div className="flex gap-2 border-l border-gray-600 pl-4">
+                <div className="flex gap-2 border-l border-gray-600 pl-4 items-center">
+                    <button 
+                        onClick={() => setShowApiKeyModal(true)} 
+                        className="text-gray-400 hover:text-white p-1 rounded" 
+                        title="Change API Key"
+                    >
+                        <KeyIcon className="w-4 h-4" />
+                    </button>
                     <button onClick={() => setLang('en')} className={`px-2 py-1 text-xs rounded-md ${lang === 'en' ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}>EN</button>
                     <button onClick={() => setLang('zh')} className={`px-2 py-1 text-xs rounded-md ${lang === 'zh' ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}>中文</button>
                 </div>
