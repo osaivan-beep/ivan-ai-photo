@@ -8,12 +8,11 @@ export const getActiveKey = (): string => {
     const localKey = localStorage.getItem('gemini_api_key');
     if (localKey && localKey.length > 10) return localKey;
 
-    // 2. Try Environment Variable (System provided key)
-    // 僅當開發者有設定且沒有被使用者覆蓋時使用。
-    // 在正式營運時，建議此處回傳空字串，強制使用者輸入自己的 Key，以免您的額度被盜用。
-    const envKey = process.env.API_KEY || "";
-    
-    return envKey;
+    // 2. System Fallback REMOVED for Security
+    // 為了營業安全，我們移除了從 process.env.API_KEY 讀取金鑰的功能。
+    // 這防止了您的個人金鑰被打包進公開網站中被盜用。
+    // 使用者必須在介面上輸入他們自己的 Key。
+    return "";
 };
 
 export const setStoredKey = (key: string) => {
@@ -34,7 +33,7 @@ const handleGeminiError = (error: unknown, context: string): never => {
       throw new Error('API 額度已滿 (Rate Limit Exceeded)。請稍後再試，或更換 API Key。');
     }
     
-    // 偵測 Key 無效或權限錯誤
+    // 偵測 Key 無效、權限錯誤或 Key 缺失
     if (msg.includes('PERMISSION_DENIED') || msg.includes('403') || msg.includes('API key not valid') || msg.includes('API_KEY_INVALID')) {
         // 拋出特定錯誤字串，讓前端 App.tsx 可以偵測並彈出視窗
         throw new Error('API_KEY_INVALID');
