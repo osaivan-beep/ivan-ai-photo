@@ -1,12 +1,10 @@
 
-const CACHE_NAME = 'ivan-ai-photo-cache-v40007'; // Increment version to force update
+const CACHE_NAME = 'ivan-ai-photo-pro-v40008-release'; // Updated for production launch
 const APP_SHELL_URLS = [
   './',
   './index.html',
   './manifest.json',
   'https://cdn.tailwindcss.com',
-  // Removed .tsx/.ts files because they do not exist in the production build.
-  // The browser will cache the actual compiled .js files automatically via HTTP cache.
 ];
 
 
@@ -14,7 +12,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting(); // Force activation immediately
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('Opened cache v40007');
+      console.log(`Opened cache ${CACHE_NAME}`);
       return cache.addAll(APP_SHELL_URLS);
     })
   );
