@@ -9,9 +9,6 @@ export const getActiveKey = (): string => {
     if (localKey && localKey.length > 10) return localKey;
 
     // 2. System Fallback REMOVED for Security
-    // 為了營業安全，我們移除了從 process.env.API_KEY 讀取金鑰的功能。
-    // 這防止了您的個人金鑰被打包進公開網站中被盜用。
-    // 使用者必須在介面上輸入他們自己的 Key。
     return "";
 };
 
@@ -28,12 +25,13 @@ const handleGeminiError = (error: unknown, context: string): never => {
   if (error instanceof Error) {
     const msg = error.message;
     
-    // 偵測額度不足
+    // 偵測額度不足 (429)
+    // 重要：錯誤訊息不要包含 "API Key" 字眼，以免 App.tsx 誤判為 Key 無效
     if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')) {
-      throw new Error('API 請求過於頻繁 (Rate Limit)。請稍候再試。');
+      throw new Error('系統忙碌中 (Google 免費額度暫時已滿)。\n請等待 30-60 秒後點擊「重試」。');
     }
     
-    // 偵測 Key 無效、權限錯誤或 Key 缺失
+    // 偵測 Key 無效、權限錯誤 (403)
     if (msg.includes('PERMISSION_DENIED') || msg.includes('403') || msg.includes('API key not valid') || msg.includes('API_KEY_INVALID')) {
         // 拋出特定錯誤字串，讓前端 App.tsx 可以偵測並彈出視窗
         throw new Error('API_KEY_INVALID');
@@ -123,7 +121,7 @@ export const refinePrompt = async (
     language: string = 'en'
 ): Promise<string> => {
   const apiKey = getActiveKey();
-  if (!apiKey) return prompt; // 若無 Key，不優化直接回傳原提示詞，避免報錯阻擋流程
+  if (!apiKey) return prompt;
 
   const ai = new GoogleGenAI({ apiKey });
   try {
@@ -156,6 +154,7 @@ export const refinePrompt = async (
   } catch (error: any) {
     console.error("Refine Prompt Error:", error);
     if (error.message?.includes('API_KEY_INVALID')) throw error;
+    // For rate limits during refinement, just return original prompt silently to avoid disrupting flow
     return prompt; 
   }
 };
