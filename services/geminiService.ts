@@ -4,15 +4,21 @@ import type { GeminiImagePart, ImageResolution } from '../types';
 
 // Dynamic retrieval function
 export const getActiveKey = (): string => {
-    // 1. Try Local Storage (User provided key - BYOK) - 這是最安全的做法
-    const localKey = localStorage.getItem('gemini_api_key');
-    if (localKey && localKey.length > 10) return localKey;
-
-    // 2. System Fallback REMOVED for Security
-    return "";
+    // Business Mode: Use the system configured (Paid) API Key exclusively.
+    // This ensures stability for all users.
+    // Note: Ensure Domain Restrictions are set in Google Cloud Console.
+    const systemKey = process.env.API_KEY;
+    
+    // Fallback: If env is missing (local dev without .env), try storage, but this is rare in prod.
+    if (!systemKey) {
+        return localStorage.getItem('gemini_api_key') || "";
+    }
+    
+    return systemKey;
 };
 
 export const setStoredKey = (key: string) => {
+    // Deprecated in Business Mode, but kept for backward compatibility if needed
     localStorage.setItem('gemini_api_key', key);
 };
 
@@ -26,17 +32,11 @@ const handleGeminiError = (error: unknown, context: string): never => {
     const msg = error.message;
     
     // 偵測額度不足 (429)
-    // 重要：錯誤訊息不要包含 "API Key" 字眼，以免 App.tsx 誤判為 Key 無效
     if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')) {
-      throw new Error('系統忙碌中 (Google 免費額度暫時已滿)。\n請等待 30-60 秒後點擊「重試」。');
+      throw new Error('系統忙碌中 (目前使用人數眾多)。\n請等待 30-60 秒後點擊「重試」。');
     }
     
-    // 偵測 Key 無效、權限錯誤 (403)
-    if (msg.includes('PERMISSION_DENIED') || msg.includes('403') || msg.includes('API key not valid') || msg.includes('API_KEY_INVALID')) {
-        // 拋出特定錯誤字串，讓前端 App.tsx 可以偵測並彈出視窗
-        throw new Error('API_KEY_INVALID');
-    }
-    
+    // 一般錯誤
     throw new Error(`${context} Error: ${msg}`);
   }
   throw new Error(`An unknown error occurred while communicating with the ${context}.`);
@@ -48,8 +48,7 @@ export const generateImageWithGemini = async (
 ): Promise<{ imageUrl: string }> => {
   
   const apiKey = getActiveKey();
-  // 如果沒有 Key，直接拋出錯誤觸發 UI
-  if (!apiKey) throw new Error("API_KEY_INVALID");
+  if (!apiKey) throw new Error("System API Key Missing. Please check configuration.");
 
   const ai = new GoogleGenAI({ apiKey });
   
@@ -93,7 +92,7 @@ export const editImageWithGemini = async (
   prompt: string
 ): Promise<{ response: GenerateContentResponse }> => {
   const apiKey = getActiveKey();
-  if (!apiKey) throw new Error("API_KEY_INVALID");
+  if (!apiKey) throw new Error("System API Key Missing.");
 
   const ai = new GoogleGenAI({ apiKey });
 
@@ -153,7 +152,6 @@ export const refinePrompt = async (
     return response.text?.trim() || prompt;
   } catch (error: any) {
     console.error("Refine Prompt Error:", error);
-    if (error.message?.includes('API_KEY_INVALID')) throw error;
     // For rate limits during refinement, just return original prompt silently to avoid disrupting flow
     return prompt; 
   }
@@ -175,7 +173,7 @@ export const generateWatermark = async (params: WatermarkParams): Promise<string
 // NEW: Video Prompt Generation
 export const generateVideoPrompt = async (image: GeminiImagePart, language: string = 'en'): Promise<string> => {
     const apiKey = getActiveKey();
-    if (!apiKey) throw new Error("API_KEY_INVALID");
+    if (!apiKey) throw new Error("System API Key Missing.");
 
     const ai = new GoogleGenAI({ apiKey });
 
@@ -212,7 +210,7 @@ export const generatePoeticText = async (
     imagePart?: GeminiImagePart
 ): Promise<string> => {
     const apiKey = getActiveKey();
-    if (!apiKey) throw new Error("API_KEY_INVALID");
+    if (!apiKey) throw new Error("System API Key Missing.");
 
     const ai = new GoogleGenAI({ apiKey });
 
