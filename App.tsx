@@ -386,14 +386,15 @@ const App: React.FC = () => {
     setAllQuickPrompts(translations[lang].defaultQuickPrompts);
   }, [lang]);
 
-  // Check for API Key on load
+  // Check for API Key ONLY when logged in (appState === 'app')
   useEffect(() => {
-    const key = getActiveKey();
-    if (!key) {
-        // Delay slightly to allow auth to settle if needed, but important for public sharing
-        setTimeout(() => setShowApiKeyModal(true), 1000);
+    if (appState === 'app') {
+        const key = getActiveKey();
+        if (!key) {
+            setShowApiKeyModal(true);
+        }
     }
-  }, []);
+  }, [appState]);
 
   const handleApiKeySave = (key: string) => {
       setStoredKey(key);
@@ -471,7 +472,7 @@ const App: React.FC = () => {
       console.error(e);
       const msg = e.message || '';
       if (msg.includes('API_KEY_INVALID') || msg.includes('API Key')) {
-          setError('API Key Invalid or Expired.');
+          setError('API Key Invalid or Missing. Please enter your Gemini API Key.');
           setShowApiKeyModal(true);
       } else if (msg.includes('permission-denied')) {
           setShowPermissionHelp(true);
