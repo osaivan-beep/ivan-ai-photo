@@ -1,4 +1,8 @@
 
+
+
+
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { GenerateContentResponse } from '@google/genai';
 import { CanvasEditor, type CanvasEditorRef } from './components/CanvasEditor';
@@ -463,8 +467,9 @@ const App: React.FC = () => {
   };
 
   const handleRefinePrompt = async () => {
+    const cost = 3;
     if (!prompt) return;
-    if (!userProfile || userProfile.credits < 1) { alert(t('notEnoughCredits')); return; }
+    if (!userProfile || userProfile.credits < cost) { alert(t('notEnoughCredits')); return; }
 
     setIsRefining(true);
     let imagePart: GeminiImagePart | null = null;
@@ -479,8 +484,8 @@ const App: React.FC = () => {
     try {
         const enhancedPrompt = await refinePrompt(prompt, imagePart, lang);
         if (enhancedPrompt && enhancedPrompt !== prompt) {
-            await deductCredits(userProfile.uid, 1);
-            setUserProfile(prev => prev ? { ...prev, credits: prev.credits - 1 } : null);
+            await deductCredits(userProfile.uid, cost);
+            setUserProfile(prev => prev ? { ...prev, credits: prev.credits - cost } : null);
             setPrompt(enhancedPrompt);
         }
     } catch (e: any) {
@@ -505,7 +510,7 @@ const App: React.FC = () => {
   };
 
   const handleGenerate = useCallback(async () => {
-    const cost = 3;
+    const cost = 5;
     if (!prompt) { setError('Please enter a prompt.'); return; }
     if (!userProfile || userProfile.credits < cost) { setError(t('notEnoughCredits')); return; }
 
@@ -647,6 +652,7 @@ const App: React.FC = () => {
             mid: { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 },
             zoom: zoom,
             pan: pan,
+            
         };
     } else if (e.touches.length === 1) {
         handlePanStart(e.touches[0].clientX, e.touches[0].clientY);
@@ -713,7 +719,16 @@ const App: React.FC = () => {
             onDeductCredits={handleDeductCredits}
         />
       )}
-      {showVideoPromptModal && selectedImage && <VideoPromptModal imageSrc={selectedImage.dataUrl} onClose={() => setShowVideoPromptModal(false)} t={t} lang={lang} />}
+      {showVideoPromptModal && selectedImage && (
+        <VideoPromptModal 
+            imageSrc={selectedImage.dataUrl} 
+            onClose={() => setShowVideoPromptModal(false)} 
+            t={t} 
+            lang={lang} 
+            userCredits={userProfile?.credits || 0}
+            onDeductCredits={handleDeductCredits}
+        />
+      )}
       {showPermissionHelp && <PermissionErrorModal onClose={() => setShowPermissionHelp(false)} />}
       
       {isLayoutEditorOpen && <LayoutEditor onComplete={handleLayoutComplete} onClose={() => setIsLayoutEditorOpen(false)} t={t} />}
