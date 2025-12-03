@@ -30,7 +30,7 @@ const handleGeminiError = (error: unknown, context: string): never => {
     
     // 偵測額度不足
     if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')) {
-      throw new Error('API 額度已滿 (Rate Limit Exceeded)。請稍後再試，或更換 API Key。');
+      throw new Error('API 請求過於頻繁 (Rate Limit)。請稍候再試。');
     }
     
     // 偵測 Key 無效、權限錯誤或 Key 缺失
