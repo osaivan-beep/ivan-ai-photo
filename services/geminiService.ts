@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI, Modality, type GenerateContentResponse } from '@google/genai';
 import type { GeminiImagePart, ImageResolution } from '../types';
 
@@ -37,9 +36,7 @@ const handleGeminiError = (error: unknown, context: string): never => {
 
 export const generateImageWithGemini = async (
   prompt: string,
-  aspectRatio: '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | null,
-  usePro: boolean = false,
-  resolution: '1K' | '2K' | '4K' = '1K'
+  aspectRatio: '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | null
 ): Promise<{ imageUrl: string }> => {
   
   const apiKey = getActiveKey();
@@ -62,21 +59,14 @@ export const generateImageWithGemini = async (
   };
 
   try {
+    // Using Gemini 2.5 Flash Image
     const config: any = {};
     if (aspectRatio) {
         config.imageConfig = { aspectRatio: aspectRatio };
     }
-    
-    // Pro Model specific configurations
-    if (usePro) {
-        if (!config.imageConfig) config.imageConfig = {};
-        config.imageConfig.imageSize = resolution;
-    }
-
-    const modelName = usePro ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
 
     const response = await ai.models.generateContent({
-      model: modelName,
+      model: 'gemini-2.5-flash-image',
       contents: { parts: [{ text: prompt }] },
       config: config,
     });
@@ -86,14 +76,13 @@ export const generateImageWithGemini = async (
     return { imageUrl: img };
 
   } catch (error: any) {
-     handleGeminiError(error, "Gemini Image API");
+     handleGeminiError(error, "Gemini 2.5 Image API");
   }
 };
 
 export const editImageWithGemini = async (
   images: GeminiImagePart[],
-  prompt: string,
-  usePro: boolean = false
+  prompt: string
 ): Promise<{ response: GenerateContentResponse }> => {
   const apiKey = getActiveKey();
   if (!apiKey) throw new Error("API Key is missing.");
@@ -105,18 +94,16 @@ export const editImageWithGemini = async (
   }));
   const textPart = { text: prompt };
   const allParts = [...imageParts, textPart];
-  
-  const modelName = usePro ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
 
   try {
     const response = await ai.models.generateContent({
-      model: modelName, 
+      model: 'gemini-2.5-flash-image', 
       contents: { parts: allParts },
     });
     return { response };
 
   } catch (error: any) {
-      handleGeminiError(error, "Gemini API");
+      handleGeminiError(error, "Gemini 2.5 API");
   }
 };
 
@@ -153,11 +140,7 @@ export const refinePrompt = async (
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash', 
       contents: { role: 'user', parts: contents },
-      config: { 
-          systemInstruction: systemInstruction, 
-          temperature: 0.7,
-          thinkingConfig: { thinkingBudget: 1024 } 
-      }
+      config: { systemInstruction: systemInstruction, temperature: 0.7 }
     });
     return response.text?.trim() || prompt;
   } catch (error) {
@@ -204,11 +187,7 @@ export const generateVideoPrompt = async (image: GeminiImagePart, language: stri
                     { text: promptText }
                 ]
             },
-            config: { 
-                systemInstruction: systemInstruction, 
-                temperature: 0.5,
-                thinkingConfig: { thinkingBudget: 1024 }
-            }
+            config: { systemInstruction: systemInstruction, temperature: 0.5 }
         });
         return response.text?.trim() || "Failed to generate prompt.";
     } catch (error) {
@@ -292,7 +271,6 @@ export const generatePoeticText = async (
             },
             config: { 
                 temperature: 0.9,
-                thinkingConfig: { thinkingBudget: 1024 }
             }
         });
         
