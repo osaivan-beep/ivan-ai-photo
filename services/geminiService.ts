@@ -6,25 +6,21 @@ import type { GeminiImagePart, ImageResolution } from '../types';
 export const getActiveKey = (): string => {
     // Business Mode: Use the system configured (Paid) API Key exclusively.
     // This ensures stability for all users.
-    // Note: Ensure Domain Restrictions are set in Google Cloud Console.
+    // CRITICAL SECURITY NOTE: You MUST set "Website Restrictions" in Google Cloud Console
+    // to allow only 'https://osaivan-beep.github.io/*' to use this key.
     const systemKey = process.env.API_KEY;
     
-    // Fallback: If env is missing (local dev without .env), try storage, but this is rare in prod.
     if (!systemKey) {
-        return localStorage.getItem('gemini_api_key') || "";
+        console.error("System API Key is missing! Check your .env file or GitHub Secrets.");
+        return "";
     }
     
     return systemKey;
 };
 
-export const setStoredKey = (key: string) => {
-    // Deprecated in Business Mode, but kept for backward compatibility if needed
-    localStorage.setItem('gemini_api_key', key);
-};
-
-export const removeStoredKey = () => {
-    localStorage.removeItem('gemini_api_key');
-};
+// Deprecated functions kept as no-ops to prevent build errors in other files referencing them
+export const setStoredKey = (key: string) => {};
+export const removeStoredKey = () => {};
 
 const handleGeminiError = (error: unknown, context: string): never => {
   console.error(`Error calling ${context}:`, error);
@@ -34,6 +30,11 @@ const handleGeminiError = (error: unknown, context: string): never => {
     // 偵測額度不足 (429)
     if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')) {
       throw new Error('系統忙碌中 (目前使用人數眾多)。\n請等待 30-60 秒後點擊「重試」。');
+    }
+    
+    // 偵測權限錯誤 (403) - 通常是 Domain 限制導致，或是 Key 無效
+    if (msg.includes('PERMISSION_DENIED') || msg.includes('403') || msg.includes('API_KEY_INVALID')) {
+        throw new Error('API 金鑰權限錯誤。請確認 Google Cloud Console 的網域限制設定。');
     }
     
     // 一般錯誤
