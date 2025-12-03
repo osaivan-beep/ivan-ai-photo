@@ -471,12 +471,15 @@ const App: React.FC = () => {
   const handleApiError = (e: any) => {
       console.error(e);
       const msg = e.message || '';
-      if (msg.includes('API_KEY_INVALID') || msg.includes('API Key')) {
+      
+      // Strict check for API Key Validity to prevent Rate Limit errors triggers
+      if (msg === 'API_KEY_INVALID') {
           setError('API Key Invalid or Missing. Please enter your Gemini API Key.');
           setShowApiKeyModal(true);
       } else if (msg.includes('permission-denied')) {
           setShowPermissionHelp(true);
       } else {
+          // Display other errors (including Rate Limits) without modal
           setError(msg);
       }
   };
