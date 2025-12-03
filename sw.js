@@ -1,23 +1,12 @@
 
-const CACHE_NAME = 'ivan-ai-photo-cache-v40005'; // Updated to v40005 to force refresh
+const CACHE_NAME = 'ivan-ai-photo-cache-v40007'; // Increment version to force update
 const APP_SHELL_URLS = [
-  '/',
-  '/index.html',
-  '/index.tsx',
-  '/App.tsx',
-  '/types.ts',
-  '/metadata.json',
-  '/components/CanvasEditor.tsx',
-  '/components/Toolbar.tsx',
-  '/components/QuickPrompts.tsx',
-  '/components/Icons.tsx',
-  '/services/geminiService.ts',
-  '/lib/translations.ts',
-  '/components/ThumbnailManager.tsx',
-  '/components/LayoutEditor.tsx',
-  '/components/PhotoEditor.tsx',
-  '/components/LightBrushPanel.tsx',
-  'https://cdn.tailwindcss.com', // This is a full URL and is safe to cache.
+  './',
+  './index.html',
+  './manifest.json',
+  'https://cdn.tailwindcss.com',
+  // Removed .tsx/.ts files because they do not exist in the production build.
+  // The browser will cache the actual compiled .js files automatically via HTTP cache.
 ];
 
 
@@ -25,7 +14,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting(); // Force activation immediately
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('Opened cache v40005');
+      console.log('Opened cache v40007');
       return cache.addAll(APP_SHELL_URLS);
     })
   );
@@ -33,10 +22,20 @@ self.addEventListener('install', (event) => {
 
 
 self.addEventListener('fetch', (event) => {
+  // Only cache http/https requests
+  if (!event.request.url.startsWith('http')) return;
+
   event.respondWith(
     caches.match(event.request).then((response) => {
-      // Cache-first for app shell resources
-      return response || fetch(event.request);
+      // Cache-first for app shell resources defined above
+      if (response) return response;
+
+      // Network-first for everything else
+      return fetch(event.request).then(networkResponse => {
+          return networkResponse;
+      }).catch(() => {
+          // Optional: Return a fallback offline page here if needed
+      });
     })
   );
 });

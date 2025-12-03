@@ -1,5 +1,4 @@
 
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { GenerateContentResponse } from '@google/genai';
 import { CanvasEditor, type CanvasEditorRef } from './components/CanvasEditor';
@@ -473,14 +472,16 @@ const App: React.FC = () => {
       console.error(e);
       const msg = e.message || '';
       
-      // Strict check for API Key Validity to prevent Rate Limit errors triggers
+      // Strict check for API Key Validity
+      // 只有在明確是 Key 錯誤 (403/Permission Denied) 時才彈窗，
+      // 避免 Rate Limit (429) 時跳出，造成使用者困擾。
       if (msg === 'API_KEY_INVALID') {
           setError('API Key Invalid or Missing. Please enter your Gemini API Key.');
           setShowApiKeyModal(true);
       } else if (msg.includes('permission-denied')) {
           setShowPermissionHelp(true);
       } else {
-          // Display other errors (including Rate Limits) without modal
+          // 一般錯誤 (含 Rate Limit) 直接顯示紅色警告
           setError(msg);
       }
   };
@@ -1019,14 +1020,16 @@ const App: React.FC = () => {
                       </div>
                       <button onClick={() => setError(null)} className="text-red-400 hover:text-white"><CloseIcon className="w-5 h-5"/></button>
                   </div>
-                   {error.includes('Key') && (
+                   {/* Explicitly check if it's the Invalid Key error to show update button */}
+                   {error.includes('Key Invalid') && (
                         <button onClick={() => setShowApiKeyModal(true)} className="mt-2 text-xs bg-red-700 hover:bg-red-600 px-2 py-1 rounded text-white underline">
                              Update API Key
                         </button>
                    )}
-                   {/* Rate Limit Retry Button */}
-                   {error.includes('Rate Limit') && (
-                       <button onClick={handleGenerate} className="mt-2 flex items-center gap-1 text-xs bg-red-700 hover:bg-red-600 px-3 py-1.5 rounded text-white font-bold transition-colors">
+                   
+                   {/* Rate Limit Retry Button - Check for rate limit keywords */}
+                   {(error.includes('Rate Limit') || error.includes('429') || error.includes('系統忙碌')) && (
+                       <button onClick={handleGenerate} className="mt-2 flex items-center gap-1 text-xs bg-red-700 hover:bg-red-600 px-3 py-1.5 rounded text-white font-bold transition-colors shadow-sm">
                            <RefreshIcon className="w-3 h-3" /> Retry / 重試
                        </button>
                    )}
