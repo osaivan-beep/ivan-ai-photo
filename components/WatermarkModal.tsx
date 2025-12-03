@@ -1,6 +1,7 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { TFunction } from '../types';
-import { CloseIcon, SparklesIcon, DownloadIcon, TextIcon } from './Icons';
+import { CloseIcon, SparklesIcon, DownloadIcon, TextIcon, SaveIcon, TrashIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, ArrowDownIcon } from './Icons';
 import { generatePoeticText } from '../services/geminiService';
 
 interface WatermarkModalProps {
@@ -38,22 +39,51 @@ const FONTS = [
 ];
 
 const POETS = [
-    '李白 (浪漫豪放)',
-    '杜甫 (沉鬱頓挫)',
-    '王維 (詩佛)',
-    '蘇軾 (豪邁不羈)',
-    '李清照 (婉約)',
-    '徐志摩 (現代浪漫)',
-    '魯迅 (犀利)',
-    '倉央嘉措 (情詩)',
-    '席慕蓉 (現代抒情)',
-    '余光中 (鄉愁)',
-    'William Shakespeare',
-    'Emily Dickinson',
-    'Robert Frost',
+    // --- 10 Chinese Poets ---
+    '李白 (浪漫豪放 - Li Bai)',
+    '杜甫 (沉鬱頓挫 - Du Fu)',
+    '王維 (空靈禪意 - Wang Wei)',
+    '蘇軾 (豪邁豁達 - Su Shi)',
+    '李清照 (婉約淒美 - Li Qingzhao)',
+    '徐志摩 (現代浪漫 - Xu Zhimo)',
+    '林徽因 (清新雋永 - Lin Huiyin)',
+    '戴望舒 (雨巷詩人 - Dai Wangshu)',
+    '席慕蓉 (溫柔抒情 - Xi Murong)',
+    '余光中 (鄉愁詩人 - Yu Guangzhong)',
+    
+    // --- 10 Western/World Poets ---
+    'William Shakespeare (Sonnet - 莎士比亞)',
+    'Emily Dickinson (Introspective - 狄金生)',
+    'Robert Frost (Nature & Realism - 佛洛斯特)',
+    'Walt Whitman (Free Verse - 惠特曼)',
+    'Edgar Allan Poe (Gothic - 愛倫坡)',
+    'Pablo Neruda (Passion - 聶魯達)',
+    'Rabindranath Tagore (Mystic - 泰戈爾)',
+    'Rumi (Sufi Mystic - 魯米)',
+    'Oscar Wilde (Aestheticism - 王爾德)',
+    'Charles Baudelaire (Symbolism - 波特萊爾)',
 ];
 
 const PRESET_COLORS = ['#D7261E', '#000000', '#FFFFFF', '#D4AF37', '#1E3A8A', '#064E3B', '#5B21B6', '#B91C1C'];
+
+interface SavedTemplate {
+    id: string;
+    name: string;
+    width: number;
+    height: number;
+    fontSizePercent: number;
+    spacing: number;
+    noise: number;
+    borderThickness: number;
+    showBorder: boolean;
+    color: string;
+    font: string;
+    style: 'yin' | 'yang' | 'signature';
+    shape: 'square' | 'circle' | 'oval';
+    layout: 'grid' | 'single';
+    direction: 'vertical' | 'horizontal';
+    alignment: 'start' | 'center' | 'end';
+}
 
 export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseImage, t, userCredits, onDeductCredits }) => {
     // Mode: 'editor' or 'ai-generator'
@@ -75,6 +105,15 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
     const [shape, setShape] = useState<'square' | 'circle' | 'oval'>('square');
     const [layout, setLayout] = useState<'grid' | 'single'>('grid'); // Grid = Auto/Multiline
     const [direction, setDirection] = useState<'vertical' | 'horizontal'>('vertical');
+    const [alignment, setAlignment] = useState<'start' | 'center' | 'end'>('center');
+
+    // User Templates State (kept for read-only compatibility if needed, but UI to save is removed)
+    const [savedTemplates, setSavedTemplates] = useState<SavedTemplate[]>(() => {
+        try {
+            const stored = localStorage.getItem('ivan-watermark-templates');
+            return stored ? JSON.parse(stored) : [];
+        } catch(e) { return []; }
+    });
 
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -88,7 +127,7 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
     // Initial Draw
     useEffect(() => {
         drawSeal();
-    }, [text, width, height, fontSizePercent, spacing, noise, borderThickness, showBorder, color, font, style, shape, layout, direction]);
+    }, [text, width, height, fontSizePercent, spacing, noise, borderThickness, showBorder, color, font, style, shape, layout, direction, alignment]);
 
     const drawSeal = () => {
         const canvas = canvasRef.current;
@@ -225,23 +264,30 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
 
         ctx.font = `${baseFontSize}px ${font}`;
         ctx.textBaseline = 'middle';
-        ctx.textAlign = 'center';
-
-        // 5. Render Text
+        
+        // 5. Render Text with Alignment
         if (direction === 'vertical') {
-            // Traditional Chinese Vertical: Right to Left Columns, Top to Bottom Characters
+            // Vertical Text: Columns right to left, Chars top to bottom
             const totalBlockWidth = lines.length * baseFontSize + (lines.length - 1) * spacing;
-            
-            // Start from the RIGHT side of the block
             const startX = (width + totalBlockWidth) / 2 - baseFontSize / 2;
 
             lines.forEach((line, lineIndex) => {
                 const chars = Array.from(line);
                 const totalColHeight = chars.length * baseFontSize + (chars.length - 1) * spacing;
-                const startY = (height - totalColHeight) / 2 + baseFontSize / 2;
                 
-                // Move LEFT for each new line (column)
+                let startY;
+                if (alignment === 'start') { // Top
+                    startY = padding + baseFontSize / 2;
+                } else if (alignment === 'end') { // Bottom
+                    startY = height - padding - totalColHeight + baseFontSize / 2;
+                } else { // Center
+                    startY = (height - totalColHeight) / 2 + baseFontSize / 2;
+                }
+                
                 const colX = startX - lineIndex * (baseFontSize + spacing);
+
+                // For vertical, individual characters are centered horizontally in the column
+                ctx.textAlign = 'center'; 
 
                 chars.forEach((char, charIndex) => {
                     const charY = startY + charIndex * (baseFontSize + spacing);
@@ -250,13 +296,26 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
             });
 
         } else {
-            // Horizontal: Rows Top to Bottom
+            // Horizontal Text: Rows top to bottom
             const totalBlockHeight = lines.length * baseFontSize + (lines.length - 1) * spacing;
             const startY = (height - totalBlockHeight) / 2 + baseFontSize / 2;
 
             lines.forEach((line, lineIndex) => {
                 const lineY = startY + lineIndex * (baseFontSize + spacing);
-                ctx.fillText(line, width / 2, lineY);
+                
+                let lineX;
+                if (alignment === 'start') { // Left
+                    ctx.textAlign = 'left';
+                    lineX = padding;
+                } else if (alignment === 'end') { // Right
+                    ctx.textAlign = 'right';
+                    lineX = width - padding;
+                } else { // Center
+                    ctx.textAlign = 'center';
+                    lineX = width / 2;
+                }
+
+                ctx.fillText(line, lineX, lineY);
             });
         }
 
@@ -287,8 +346,9 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
     };
 
     const handleAiGenerate = async () => {
-        if (userCredits < 3) {
-            alert(t('notEnoughCredits') + "\n(Need 3 credits)");
+        const cost = 5;
+        if (userCredits < cost) {
+            alert(t('notEnoughCredits') + `\n(Need ${cost} credits)`);
             return;
         }
 
@@ -306,7 +366,7 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
             if (result) {
                 setGeneratedText(result);
                 // Deduct credits on successful generation
-                onDeductCredits(3);
+                onDeductCredits(cost);
             } else {
                 setGeneratedText("生成失敗。請檢查網絡或重試。\n(Generation Failed)");
             }
@@ -318,25 +378,54 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
         }
     };
 
-    const applyTemplate = (type: 'yin-square' | 'sign-square' | 'sign-oval' | 'sign-square-2') => {
+    // --- Template Management ---
+
+    const applyTemplate = (tmpl: Partial<SavedTemplate>) => {
+        if (tmpl.width) setWidth(tmpl.width);
+        if (tmpl.height) setHeight(tmpl.height);
+        if (tmpl.fontSizePercent) setFontSizePercent(tmpl.fontSizePercent);
+        if (tmpl.spacing !== undefined) setSpacing(tmpl.spacing);
+        if (tmpl.noise !== undefined) setNoise(tmpl.noise);
+        if (tmpl.borderThickness) setBorderThickness(tmpl.borderThickness);
+        if (tmpl.showBorder !== undefined) setShowBorder(tmpl.showBorder);
+        if (tmpl.color) setColor(tmpl.color);
+        if (tmpl.font) setFont(tmpl.font);
+        if (tmpl.style) setStyle(tmpl.style);
+        if (tmpl.shape) setShape(tmpl.shape);
+        if (tmpl.layout) setLayout(tmpl.layout);
+        if (tmpl.direction) setDirection(tmpl.direction);
+        if (tmpl.alignment) setAlignment(tmpl.alignment);
+    };
+
+    const applyPreset = (type: 'yin-square' | 'sign-square' | 'sign-oval' | 'sign-square-2' | 'classic-round' | 'modern-tech' | 'vertical-calligraphy' | 'aged-seal') => {
         if (type === 'yin-square') {
-            setStyle('yin'); setShape('square'); setFont(FONTS[2].value);
-            setLayout('grid'); setDirection('vertical');
-            setColor('#D7261E'); setWidth(250); setHeight(300);
-            setFontSizePercent(90); setShowBorder(false);
+            applyTemplate({ style:'yin', shape:'square', font: FONTS[2].value, layout:'grid', direction:'vertical', alignment:'center', color:'#D7261E', width:250, height:300, fontSizePercent:90, showBorder:false, noise:0 });
         } else if (type === 'sign-square') {
-            setStyle('yang'); setShape('square'); setFont(FONTS[3].value);
-            setLayout('grid'); setDirection('vertical');
-            setColor('#D7261E'); setWidth(250); setHeight(300); setShowBorder(true); setBorderThickness(6);
+            applyTemplate({ style:'yang', shape:'square', font: FONTS[3].value, layout:'grid', direction:'vertical', alignment:'center', color:'#D7261E', width:250, height:300, fontSizePercent:90, showBorder:true, borderThickness:6, noise:0 });
         } else if (type === 'sign-oval') {
-            setStyle('yang'); setShape('oval'); setFont(FONTS[4].value);
-            setLayout('grid'); setDirection('vertical');
-            setColor('#D7261E'); setWidth(200); setHeight(300); setShowBorder(true); setBorderThickness(6);
+            applyTemplate({ style:'yang', shape:'oval', font: FONTS[4].value, layout:'grid', direction:'vertical', alignment:'center', color:'#D7261E', width:200, height:300, fontSizePercent:90, showBorder:true, borderThickness:6, noise:0 });
         } else if (type === 'sign-square-2') {
-             setStyle('signature'); setShape('square'); setFont(FONTS[6].value);
-             setLayout('single'); setDirection('horizontal');
-             setColor('#000000'); setWidth(300); setHeight(100);
+             applyTemplate({ style:'signature', shape:'square', font: FONTS[6].value, layout:'single', direction:'horizontal', alignment:'center', color:'#000000', width:300, height:100, fontSizePercent:90, noise:0 });
+        } else if (type === 'classic-round') {
+            // Classical Round: Yang, Circle, Red, Border, Old Font
+            applyTemplate({ style:'yang', shape:'circle', font: FONTS[0].value, layout:'grid', direction:'vertical', alignment:'center', color:'#B91C1C', width:300, height:300, fontSizePercent:85, showBorder:true, borderThickness:8, noise:5 });
+        } else if (type === 'modern-tech') {
+            // Modern Tech: Yang, Square, Blue, Sans-serif, Horizontal
+            applyTemplate({ style:'yang', shape:'square', font: FONTS[1].value, layout:'single', direction:'horizontal', alignment:'start', color:'#1E3A8A', width:350, height:100, fontSizePercent:80, showBorder:true, borderThickness:4, noise:0 });
+        } else if (type === 'vertical-calligraphy') {
+            // Vertical Calligraphy: No Border (Yang but transparent), Black, Vertical
+            applyTemplate({ style:'yang', shape:'square', font: FONTS[2].value, layout:'grid', direction:'vertical', alignment:'start', color:'#000000', width:120, height:400, fontSizePercent:90, showBorder:false, noise:0 });
+        } else if (type === 'aged-seal') {
+            // Aged Seal: Yin, Square, High Noise
+            applyTemplate({ style:'yin', shape:'square', font: FONTS[5].value, layout:'grid', direction:'vertical', alignment:'center', color:'#8B0000', width:280, height:280, fontSizePercent:95, showBorder:false, noise:40 });
         }
+    };
+
+    const handleDeleteTemplate = (id: string) => {
+        if (!confirm(t('wm_confirmDelete'))) return;
+        const updated = savedTemplates.filter(t => t.id !== id);
+        setSavedTemplates(updated);
+        localStorage.setItem('ivan-watermark-templates', JSON.stringify(updated));
     };
     
     const handleDownload = () => {
@@ -419,7 +508,7 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
                              ) : (
                                  <>
                                     <SparklesIcon className="w-5 h-5"/>
-                                    {t('startGenerate')} (消耗 3 點數)
+                                    {t('startGenerate')} (消耗 5 點數)
                                  </>
                              )}
                          </button>
@@ -442,7 +531,7 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
                                         onClick={() => { 
                                             setText(generatedText); 
                                             setMode('editor'); 
-                                            applyTemplate('yin-square');
+                                            applyPreset('yin-square');
                                         }} 
                                         className="px-6 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold shadow-sm transition-colors"
                                      >
@@ -483,17 +572,32 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
 
                     {/* Text Edit */}
                     <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-                        <div className="flex justify-between items-center mb-3">
+                        <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
                              <label className="font-bold text-gray-700 flex items-center gap-2">
                                 <TextIcon className="w-4 h-4 text-gray-500"/>
                                 {t('textContentEdit')}
                              </label>
-                             <button 
-                                onClick={() => setMode('ai-generator')} 
-                                className="text-xs bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-full flex items-center gap-1.5 hover:shadow-md transition-all active:scale-95 font-semibold"
-                             >
-                                 <SparklesIcon className="w-3 h-3"/> {t('aiInspirationTitle')}
-                             </button>
+                             <div className="flex items-center gap-2">
+                                 {/* In-Editor Alignment Controls */}
+                                 <div className="flex bg-gray-100 rounded-lg p-0.5 border border-gray-200">
+                                     <button onClick={() => setAlignment('start')} className={`p-1.5 rounded-md transition-all ${alignment === 'start' ? 'bg-white shadow text-purple-600' : 'text-gray-400 hover:text-gray-600'}`} title={direction === 'vertical' ? t('alignTop') : t('alignLeft')}>
+                                         {direction === 'vertical' ? <ArrowUpIcon className="w-3 h-3"/> : <ArrowLeftIcon className="w-3 h-3"/>}
+                                     </button>
+                                     <button onClick={() => setAlignment('center')} className={`p-1.5 rounded-md transition-all ${alignment === 'center' ? 'bg-white shadow text-purple-600' : 'text-gray-400 hover:text-gray-600'}`} title={t('alignCenter')}>
+                                         <div className="w-2 h-2 rounded-full bg-current mx-auto opacity-70"></div>
+                                     </button>
+                                     <button onClick={() => setAlignment('end')} className={`p-1.5 rounded-md transition-all ${alignment === 'end' ? 'bg-white shadow text-purple-600' : 'text-gray-400 hover:text-gray-600'}`} title={direction === 'vertical' ? t('alignBottom') : t('alignRight')}>
+                                         {direction === 'vertical' ? <ArrowDownIcon className="w-3 h-3"/> : <ArrowRightIcon className="w-3 h-3"/>}
+                                     </button>
+                                 </div>
+                                 
+                                 <button 
+                                    onClick={() => setMode('ai-generator')} 
+                                    className="text-xs bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-3 py-1.5 rounded-full flex items-center gap-1 hover:shadow-md transition-all active:scale-95 font-semibold"
+                                 >
+                                     <SparklesIcon className="w-3 h-3"/> {t('aiInspirationTitle')}
+                                 </button>
+                             </div>
                         </div>
                         <textarea 
                             className="w-full border border-gray-300 rounded-lg p-3 text-lg font-serif resize-none focus:ring-2 focus:ring-purple-500 outline-none text-gray-900 transition-shadow leading-relaxed"
@@ -507,48 +611,89 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
 
                 {/* Right Panel */}
                 <div className="w-full md:w-1/2 lg:w-5/12 bg-white border-l border-gray-200 flex flex-col">
-                    <div className="p-5 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                    <div className="p-5 pr-16 border-b border-gray-200 flex justify-between items-center bg-gray-50">
                         <h3 className="font-bold text-gray-800">{t('styleFineTuning')}</h3>
-                        <button onClick={() => {
-                            setText('伊凡水墨'); setStyle('yin'); setShape('square'); setDirection('vertical');
-                        }} className="text-xs bg-white border border-gray-300 hover:bg-gray-100 px-3 py-1.5 rounded-md text-gray-600 transition-colors shadow-sm">{t('reset')}</button>
                     </div>
                     
                     <div className="flex-grow p-6 overflow-y-auto space-y-8 custom-scrollbar">
                         {/* Templates Row */}
                         <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 block">{t('styleTemplates')}</label>
+                            {/* Saved Templates */}
+                            {savedTemplates.length > 0 && (
+                                <div className="mb-4">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 block">{t('wm_myTemplates')}</label>
+                                    <div className="grid grid-cols-4 gap-3">
+                                        {savedTemplates.map(tmpl => (
+                                            <div key={tmpl.id} className="relative group">
+                                                <button onClick={() => applyTemplate(tmpl)} className="w-full p-2 border rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all flex flex-col items-center gap-2">
+                                                    <div className="w-8 h-8 rounded bg-gray-200 shadow-sm flex items-center justify-center text-xs font-bold text-gray-500">
+                                                        {tmpl.name.charAt(0)}
+                                                    </div>
+                                                    <span className="text-[10px] text-gray-600 font-medium truncate w-full text-center">{tmpl.name}</span>
+                                                </button>
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(tmpl.id); }}
+                                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                >
+                                                    <TrashIcon className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 block">{t('wm_systemTemplates')}</label>
                             <div className="grid grid-cols-4 gap-3">
-                                 <button onClick={() => applyTemplate('yin-square')} className="group p-2 border rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all flex flex-col items-center gap-2">
+                                 {/* Original 4 */}
+                                 <button onClick={() => applyPreset('yin-square')} className="group p-2 border rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all flex flex-col items-center gap-2">
                                      <div className="w-8 h-8 rounded bg-red-700 shadow-sm group-hover:scale-110 transition-transform"></div>
                                      <span className="text-[10px] text-gray-600 font-medium">陰刻方</span>
                                  </button>
-                                 <button onClick={() => applyTemplate('sign-square')} className="group p-2 border rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all flex flex-col items-center gap-2">
+                                 <button onClick={() => applyPreset('sign-square')} className="group p-2 border rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all flex flex-col items-center gap-2">
                                      <div className="w-8 h-8 rounded border-2 border-red-700 shadow-sm group-hover:scale-110 transition-transform"></div>
                                      <span className="text-[10px] text-gray-600 font-medium">陽刻方</span>
                                  </button>
-                                 <button onClick={() => applyTemplate('sign-oval')} className="group p-2 border rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all flex flex-col items-center gap-2">
+                                 <button onClick={() => applyPreset('sign-oval')} className="group p-2 border rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all flex flex-col items-center gap-2">
                                      <div className="w-6 h-8 rounded-[1rem] border-2 border-red-700 shadow-sm group-hover:scale-110 transition-transform"></div>
                                      <span className="text-[10px] text-gray-600 font-medium">陽刻圓</span>
                                  </button>
-                                 <button onClick={() => applyTemplate('sign-square-2')} className="group p-2 border rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all flex flex-col items-center gap-2">
+                                 <button onClick={() => applyPreset('sign-square-2')} className="group p-2 border rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all flex flex-col items-center gap-2">
                                      <div className="w-10 h-6 bg-black rounded-sm shadow-sm group-hover:scale-110 transition-transform"></div>
                                      <span className="text-[10px] text-gray-600 font-medium">手寫</span>
+                                 </button>
+                                 
+                                 {/* New 4 */}
+                                 <button onClick={() => applyPreset('classic-round')} className="group p-2 border rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all flex flex-col items-center gap-2">
+                                     <div className="w-8 h-8 rounded-full border-2 border-red-800 shadow-sm group-hover:scale-110 transition-transform"></div>
+                                     <span className="text-[10px] text-gray-600 font-medium">古典圓章</span>
+                                 </button>
+                                 <button onClick={() => applyPreset('modern-tech')} className="group p-2 border rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all flex flex-col items-center gap-2">
+                                     <div className="w-10 h-6 border-2 border-blue-900 rounded-sm shadow-sm group-hover:scale-110 transition-transform"></div>
+                                     <span className="text-[10px] text-gray-600 font-medium">現代科技</span>
+                                 </button>
+                                 <button onClick={() => applyPreset('vertical-calligraphy')} className="group p-2 border rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all flex flex-col items-center gap-2">
+                                     <div className="w-4 h-10 bg-transparent border-r border-black border-dashed shadow-sm group-hover:scale-110 transition-transform"></div>
+                                     <span className="text-[10px] text-gray-600 font-medium">直式書法</span>
+                                 </button>
+                                 <button onClick={() => applyPreset('aged-seal')} className="group p-2 border rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all flex flex-col items-center gap-2">
+                                     <div className="w-8 h-8 bg-red-900 opacity-80 rounded-sm shadow-sm group-hover:scale-110 transition-transform" style={{backgroundImage: 'radial-gradient(#fff 10%, transparent 10%)', backgroundSize: '4px 4px'}}></div>
+                                     <span className="text-[10px] text-gray-600 font-medium">做舊古印</span>
                                  </button>
                             </div>
                         </div>
 
                         {/* Layout & Direction */}
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-2">
                             <div>
-                                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">排版模式</label>
+                                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">{t('watermarkLayoutLabel')}</label>
                                  <div className="flex bg-gray-100 rounded-lg p-1">
                                      <button onClick={() => setLayout('grid')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${layout === 'grid' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{t('layoutGrid')}</button>
                                      <button onClick={() => setLayout('single')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${layout === 'single' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{t('layoutSingle')}</button>
                                  </div>
                             </div>
                             <div>
-                                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">排列方向</label>
+                                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">{t('watermarkDirectionLabel')}</label>
                                  <div className="flex bg-gray-100 rounded-lg p-1">
                                      <button onClick={() => setDirection('vertical')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${direction === 'vertical' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{t('dirVertical')}</button>
                                      <button onClick={() => setDirection('horizontal')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${direction === 'horizontal' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{t('dirHorizontal')}</button>
@@ -602,9 +747,17 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
                                  { label: t('watermarkNoiseLabel'), val: noise, set: setNoise, min: 0, max: 100, unit: '%' },
                              ].map((slider, idx) => (
                                  <div key={idx} className="group">
-                                     <div className="flex justify-between mb-1.5">
+                                     <div className="flex justify-between mb-1.5 items-center">
                                          <span className="text-xs font-medium text-gray-600">{slider.label}</span>
-                                         <span className="text-xs text-gray-400 font-mono bg-gray-100 px-1.5 rounded">{slider.val}{slider.unit}</span>
+                                         <div className="flex items-center gap-1">
+                                             <input 
+                                                type="number" 
+                                                value={slider.val} 
+                                                onChange={(e) => slider.set(Number(e.target.value))}
+                                                className="w-12 text-xs bg-gray-100 border border-gray-300 rounded px-1 py-0.5 text-right focus:outline-none focus:border-purple-500 text-gray-900 font-bold"
+                                             />
+                                             <span className="text-xs text-gray-400 font-mono w-4">{slider.unit}</span>
+                                         </div>
                                      </div>
                                      <input 
                                         type="range" 
@@ -636,7 +789,14 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
                                             onChange={e => setBorderThickness(Number(e.target.value))} 
                                             className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
                                         />
-                                        <span className="text-xs text-gray-400 font-mono w-6 text-right">{borderThickness}</span>
+                                        <div className="flex items-center gap-1">
+                                             <input 
+                                                type="number" 
+                                                value={borderThickness} 
+                                                onChange={(e) => setBorderThickness(Number(e.target.value))}
+                                                className="w-10 text-xs bg-gray-100 border border-gray-300 rounded px-1 py-0.5 text-right focus:outline-none focus:border-purple-500 text-gray-900 font-bold"
+                                             />
+                                        </div>
                                     </div>
                                 )}
                             </div>

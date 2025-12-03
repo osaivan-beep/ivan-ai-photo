@@ -1,4 +1,7 @@
 
+
+
+
 import { GoogleGenAI, Modality, type GenerateContentResponse } from '@google/genai';
 import type { GeminiImagePart, ImageResolution } from '../types';
 
@@ -171,20 +174,58 @@ export const generateWatermark = async (params: WatermarkParams): Promise<string
     return ""; 
 };
 
-// NEW: Video Prompt Generation
-export const generateVideoPrompt = async (image: GeminiImagePart, language: string = 'en'): Promise<string> => {
+// NEW: Video Prompt Structure
+export interface VideoPromptResultScheme {
+    title: string;
+    tags: string[];
+    visual_prompt: string;
+    camera_atmosphere: string;
+    audio_prompt: string;
+}
+
+export const generateVideoPrompt = async (
+    image: GeminiImagePart, 
+    params: { userInput: string, camera: string },
+    language: string = 'en'
+): Promise<VideoPromptResultScheme[]> => {
     const apiKey = getActiveKey();
     if (!apiKey) throw new Error("System API Key Missing.");
 
     const ai = new GoogleGenAI({ apiKey });
 
-    const systemInstruction = language === 'zh' 
-        ? "你是一位專業的 AI 影片提示詞工程師。請分析這張圖片，並撰寫一段高品質的影片生成提示詞（適用於 Sora, Runway, Kling 等模型）。"
-        : "You are an expert AI video prompt engineer. Analyze this image and write a high-quality prompt for video generation models (like Sora, Runway, Kling).";
-
-    const promptText = language === 'zh'
-        ? "請描述這張圖的主體、動作、運鏡方式（如平移、推軌、環繞）、光影與氛圍。輸出格式：[主體描述] + [動作描述] + [運鏡與視角] + [風格與氛圍]。請用繁體中文輸出。"
-        : "Describe the subject, action, camera movement (pan, dolly, orbit), lighting, and atmosphere. Output format: [Subject] + [Action] + [Camera] + [Style].";
+    const systemInstruction = `
+    You are a professional AI Film Director and Prompt Engineer.
+    
+    Task:
+    Analyze the provided image and the user's request (if any) to create 3 distinct video generation concepts.
+    
+    Inputs:
+    1. Image (Visual Reference)
+    2. User Idea: "${params.userInput}" (If empty, infer from image)
+    3. Required Camera Movement: "${params.camera}" (Must be applied to all schemes if specified)
+    
+    Output 3 Schemes:
+    1. Cinematic / Realistic (Documentary or Movie style)
+    2. Dynamic / High Motion (Action or Fast-paced style)
+    3. Creative / Abstract (Dreamy, artistic, or emotional style)
+    
+    Output Format:
+    Strictly return a JSON array with 3 objects. No markdown formatting.
+    Structure:
+    [
+      {
+        "title": "Short Creative Title",
+        "tags": ["Tag1", "Tag2", "Tag3"],
+        "visual_prompt": "Detailed description of the subject, action, and key visual elements.",
+        "camera_atmosphere": "Specific camera movement instructions, lighting, and mood.",
+        "audio_prompt": "Sound design, ambient noise, and specific sound effects."
+      },
+      ...
+    ]
+    
+    Language Requirement:
+    ${language === 'zh' ? 'All content MUST be in Traditional Chinese (繁體中文), except for specific technical terms if needed.' : 'All content must be in English.'}
+    `;
 
     try {
         const response = await ai.models.generateContent({
@@ -193,14 +234,28 @@ export const generateVideoPrompt = async (image: GeminiImagePart, language: stri
                 role: 'user',
                 parts: [
                     { inlineData: { data: image.base64Data, mimeType: image.mimeType } },
-                    { text: promptText }
+                    { text: "Generate the video prompt schemes." }
                 ]
             },
-            config: { systemInstruction: systemInstruction, temperature: 0.5 }
+            config: { 
+                systemInstruction: systemInstruction, 
+                temperature: 0.7,
+                responseMimeType: "application/json"
+            }
         });
-        return response.text?.trim() || "Failed to generate prompt.";
+        
+        const text = response.text?.trim();
+        if (!text) throw new Error("Empty response");
+        
+        // Clean markdown if present (though responseMimeType should handle it)
+        const jsonStr = text.replace(/^```json\n|\n```$/g, '');
+        const schemes = JSON.parse(jsonStr);
+        
+        return schemes;
+
     } catch (error: any) {
         handleGeminiError(error, "Gemini Video Prompt");
+        return [];
     }
 };
 
