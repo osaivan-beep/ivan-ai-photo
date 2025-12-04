@@ -1,5 +1,7 @@
 
 
+
+
 const zhBirdsPrompts = [
     "圖1的鳥站在圖2的樹藤上 樹藤底下裸空",
     "圖1與圖2的鳥,是一對恩愛情侶,頭上羽毛澎起,站在圖3的樹藤上",
@@ -90,7 +92,7 @@ const zhPortraitPrompts = [
     "將圖1的人和圖2的人合成在同一畫面,光影色調一致",
     "把圖1人物的姿勢改成圖2的姿勢,服裝細節保持不變",
     "讓畫面中的人複製出2份,形成影分身效果",
-    "將照片中的人變成未來感十足的機器人形象,保留部分人類特徵,金屬質感皮膚",
+    "讓圖1的角色, 穿上圖2的服飾,保持原本的外貌特徵",
     "讓照片中的女人穿上傳統古裝,漢服或旗袍,髮型也對應改變",
     "讓人穿上未來科技感的服裝,帶有發光線條與機械裝甲",
     "這個人除頭部外, 全身變成被火焰包圍的惡靈騎士,騎著燃燒的機車",
@@ -466,6 +468,9 @@ export const translations = {
     // Added missing keys to avoid potential type errors or UI issues
     quickEffectsLabel: "Quick Styles",
     lightColorLabel: "Color",
+    // Upscale
+    upscale2xButton: "2x Smart Upscale",
+    upscalingState: "Upscaling...",
   },
   zh: {
     title: "伊凡 Ai photo",
@@ -755,5 +760,8 @@ export const translations = {
     vp_cam_follow: "準確跟隨主題 (Subject Follow)",
     vp_cam_orbit_in: "環繞主題並拉近 (Orbit & Zoom In)",
     vp_cam_orbit_out: "環繞主題並拉遠 (Orbit & Zoom Out)",
+    // Upscale
+    upscale2xButton: "2x 智慧放大",
+    upscalingState: "放大處理中...",
   }
 };

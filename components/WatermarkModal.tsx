@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { TFunction } from '../types';
 import { CloseIcon, SparklesIcon, DownloadIcon, TextIcon, SaveIcon, TrashIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, ArrowDownIcon } from './Icons';
@@ -107,7 +109,7 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
     const [direction, setDirection] = useState<'vertical' | 'horizontal'>('vertical');
     const [alignment, setAlignment] = useState<'start' | 'center' | 'end'>('center');
 
-    // User Templates State (kept for read-only compatibility if needed, but UI to save is removed)
+    // User Templates State
     const [savedTemplates, setSavedTemplates] = useState<SavedTemplate[]>(() => {
         try {
             const stored = localStorage.getItem('ivan-watermark-templates');
@@ -365,7 +367,6 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
             const result = await generatePoeticText(writerStyle, language, imagePart);
             if (result) {
                 setGeneratedText(result);
-                // Deduct credits on successful generation
                 onDeductCredits(cost);
             } else {
                 setGeneratedText("生成失敗。請檢查網絡或重試。\n(Generation Failed)");
@@ -377,8 +378,6 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
             setAiLoading(false);
         }
     };
-
-    // --- Template Management ---
 
     const applyTemplate = (tmpl: Partial<SavedTemplate>) => {
         if (tmpl.width) setWidth(tmpl.width);
@@ -407,16 +406,12 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
         } else if (type === 'sign-square-2') {
              applyTemplate({ style:'signature', shape:'square', font: FONTS[6].value, layout:'single', direction:'horizontal', alignment:'center', color:'#000000', width:300, height:100, fontSizePercent:90, noise:0 });
         } else if (type === 'classic-round') {
-            // Classical Round: Yang, Circle, Red, Border, Old Font
             applyTemplate({ style:'yang', shape:'circle', font: FONTS[0].value, layout:'grid', direction:'vertical', alignment:'center', color:'#B91C1C', width:300, height:300, fontSizePercent:85, showBorder:true, borderThickness:8, noise:5 });
         } else if (type === 'modern-tech') {
-            // Modern Tech: Yang, Square, Blue, Sans-serif, Horizontal
             applyTemplate({ style:'yang', shape:'square', font: FONTS[1].value, layout:'single', direction:'horizontal', alignment:'start', color:'#1E3A8A', width:350, height:100, fontSizePercent:80, showBorder:true, borderThickness:4, noise:0 });
         } else if (type === 'vertical-calligraphy') {
-            // Vertical Calligraphy: No Border (Yang but transparent), Black, Vertical
             applyTemplate({ style:'yang', shape:'square', font: FONTS[2].value, layout:'grid', direction:'vertical', alignment:'start', color:'#000000', width:120, height:400, fontSizePercent:90, showBorder:false, noise:0 });
         } else if (type === 'aged-seal') {
-            // Aged Seal: Yin, Square, High Noise
             applyTemplate({ style:'yin', shape:'square', font: FONTS[5].value, layout:'grid', direction:'vertical', alignment:'center', color:'#8B0000', width:280, height:280, fontSizePercent:95, showBorder:false, noise:40 });
         }
     };
@@ -441,7 +436,6 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
         }
     };
 
-    // AI Inspiration Modal Content
     if (mode === 'ai-generator') {
         return (
             <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/95 backdrop-blur-md">
@@ -454,7 +448,6 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
                         <button onClick={() => setMode('editor')}><CloseIcon className="w-6 h-6 text-gray-400"/></button>
                      </div>
                      <div className="p-6 space-y-6 overflow-y-auto">
-                         {/* Step 1 */}
                          <div>
                              <label className="block text-sm font-semibold text-gray-700 mb-2">{t('uploadReferenceImage')}</label>
                              <div 
@@ -477,8 +470,6 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
                                  <input id="ref-upload" type="file" className="hidden" onChange={handleRefImageUpload} accept="image/*" />
                              </div>
                          </div>
-                         
-                         {/* Step 2 & 3 */}
                          <div className="grid grid-cols-2 gap-4">
                              <div>
                                  <label className="block text-sm font-semibold text-gray-700 mb-2">{t('selectWriterStyle')}</label>
@@ -494,7 +485,6 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
                                  </select>
                              </div>
                          </div>
-                         
                          <button 
                             onClick={handleAiGenerate}
                             disabled={aiLoading}
@@ -512,7 +502,6 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
                                  </>
                              )}
                          </button>
-
                          {generatedText && (
                              <div className="bg-gray-50 rounded-lg border border-gray-200 animate-fade-in flex flex-col overflow-hidden">
                                  <div className="p-3 bg-gray-100 border-b border-gray-200 text-xs text-gray-500 font-bold uppercase tracking-wider">
@@ -546,39 +535,63 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
         );
     }
 
-    // Editor View
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/95 backdrop-blur-sm overflow-hidden">
              <div className="bg-white w-full h-full md:max-w-6xl md:h-[90vh] md:rounded-xl shadow-2xl flex flex-col md:flex-row overflow-hidden relative">
                 
                 {/* Header for Mobile */}
-                <div className="md:hidden p-4 border-b flex justify-between items-center bg-white">
+                <div className="md:hidden p-4 border-b flex justify-between items-center bg-white flex-shrink-0 z-10">
                     <h3 className="font-bold text-gray-800">{t('watermarkTitle')}</h3>
                     <button onClick={onClose}><CloseIcon className="w-6 h-6 text-gray-600"/></button>
                 </div>
                 <button onClick={onClose} className="hidden md:block absolute top-4 right-4 z-20 bg-gray-100 p-2 rounded-full hover:bg-gray-200 shadow-sm"><CloseIcon className="w-6 h-6 text-gray-600"/></button>
 
-                {/* Left Panel */}
-                <div className="w-full md:w-1/2 lg:w-7/12 p-4 md:p-8 bg-gray-50 flex flex-col gap-6 overflow-y-auto">
-                    <div className="hidden md:block text-center">
+                {/* Left Panel: Preview (Fixed at top on mobile) */}
+                <div className="w-full h-[35vh] md:w-7/12 md:h-full p-4 md:p-8 bg-gray-50 flex flex-col items-center justify-center relative shadow-inner md:shadow-none flex-shrink-0 md:flex-shrink-1">
+                    <div className="hidden md:block text-center mb-6">
                         <h2 className="text-2xl font-bold text-gray-800 tracking-tight">{t('watermarkTitle')}</h2>
                     </div>
-
-                    {/* Preview Area */}
-                    <div className="flex-grow flex items-center justify-center min-h-[300px] border border-gray-200 rounded-xl bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAADFJREFUOE9jZGBgEGHAD97gk2Y4QwMDFmF0WXD//3+G/////4ctJq8F6NYx4jUAAQYAdyY3wX7LP6IAAAAASUVORK5CYII=')] relative shadow-inner">
-                         <canvas ref={canvasRef} style={{ width: `${width}px`, height: `${height}px`, maxWidth: '90%', maxHeight: '90%', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
-                         <span className="absolute bottom-2 right-2 text-xs text-gray-400 bg-white/80 px-2 py-1 rounded">{width}px x {height}px</span>
+                    {/* Preview Canvas Area */}
+                    <div className="w-full h-full flex items-center justify-center border border-gray-200 rounded-xl bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAADFJREFUOE9jZGBgEGHAD97gk2Y4QwMDFmF0WXD//3+G/////4ctJq8F6NYx4jUAAQYAdyY3wX7LP6IAAAAASUVORK5CYII=')] relative shadow-sm overflow-hidden">
+                         <canvas ref={canvasRef} style={{ width: `${width}px`, height: `${height}px`, maxWidth: '90%', maxHeight: '90%', objectFit: 'contain', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
+                         <span className="absolute bottom-2 right-2 text-xs text-gray-400 bg-white/80 px-2 py-1 rounded shadow-sm">{width}px x {height}px</span>
                     </div>
+                </div>
 
-                    {/* Text Edit */}
-                    <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-                        <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
-                             <label className="font-bold text-gray-700 flex items-center gap-2">
-                                <TextIcon className="w-4 h-4 text-gray-500"/>
-                                {t('textContentEdit')}
-                             </label>
-                             <div className="flex items-center gap-2">
-                                 {/* In-Editor Alignment Controls */}
+                {/* Right Panel: Settings (Scrollable) */}
+                <div className="w-full flex-grow md:w-5/12 md:h-full bg-white border-t md:border-l border-gray-200 flex flex-col overflow-hidden">
+                    {/* Header Desktop */}
+                    <div className="hidden md:flex p-5 pr-16 border-b border-gray-200 justify-between items-center bg-gray-50">
+                        <h3 className="font-bold text-gray-800">{t('styleFineTuning')}</h3>
+                    </div>
+                    
+                    <div className="flex-grow p-5 md:p-6 overflow-y-auto space-y-6 custom-scrollbar">
+                        
+                        {/* 1. Text Input Area (Moved here for mobile visibility) */}
+                        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                            <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
+                                <label className="font-bold text-gray-700 flex items-center gap-2 text-sm">
+                                    <TextIcon className="w-4 h-4 text-gray-500"/>
+                                    {t('textContentEdit')}
+                                </label>
+                                <div className="flex items-center gap-2">
+                                    <button 
+                                        onClick={() => setMode('ai-generator')} 
+                                        className="text-xs bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-3 py-1.5 rounded-full flex items-center gap-1 hover:shadow-md transition-all active:scale-95 font-semibold"
+                                    >
+                                        <SparklesIcon className="w-3 h-3"/> {t('aiInspirationTitle')}
+                                    </button>
+                                </div>
+                            </div>
+                            <textarea 
+                                className="w-full border border-gray-300 rounded-lg p-3 text-lg font-serif resize-none focus:ring-2 focus:ring-purple-500 outline-none text-gray-900 transition-shadow leading-relaxed"
+                                rows={3}
+                                value={text}
+                                onChange={(e) => setText(e.target.value)}
+                                placeholder="輸入文字..."
+                            />
+                            {/* In-Editor Alignment Controls */}
+                            <div className="flex justify-end mt-2">
                                  <div className="flex bg-gray-100 rounded-lg p-0.5 border border-gray-200">
                                      <button onClick={() => setAlignment('start')} className={`p-1.5 rounded-md transition-all ${alignment === 'start' ? 'bg-white shadow text-purple-600' : 'text-gray-400 hover:text-gray-600'}`} title={direction === 'vertical' ? t('alignTop') : t('alignLeft')}>
                                          {direction === 'vertical' ? <ArrowUpIcon className="w-3 h-3"/> : <ArrowLeftIcon className="w-3 h-3"/>}
@@ -590,35 +603,11 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
                                          {direction === 'vertical' ? <ArrowDownIcon className="w-3 h-3"/> : <ArrowRightIcon className="w-3 h-3"/>}
                                      </button>
                                  </div>
-                                 
-                                 <button 
-                                    onClick={() => setMode('ai-generator')} 
-                                    className="text-xs bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-3 py-1.5 rounded-full flex items-center gap-1 hover:shadow-md transition-all active:scale-95 font-semibold"
-                                 >
-                                     <SparklesIcon className="w-3 h-3"/> {t('aiInspirationTitle')}
-                                 </button>
-                             </div>
+                            </div>
                         </div>
-                        <textarea 
-                            className="w-full border border-gray-300 rounded-lg p-3 text-lg font-serif resize-none focus:ring-2 focus:ring-purple-500 outline-none text-gray-900 transition-shadow leading-relaxed"
-                            rows={5}
-                            value={text}
-                            onChange={(e) => setText(e.target.value)}
-                            placeholder="輸入文字..."
-                        />
-                    </div>
-                </div>
 
-                {/* Right Panel */}
-                <div className="w-full md:w-1/2 lg:w-5/12 bg-white border-l border-gray-200 flex flex-col">
-                    <div className="p-5 pr-16 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                        <h3 className="font-bold text-gray-800">{t('styleFineTuning')}</h3>
-                    </div>
-                    
-                    <div className="flex-grow p-6 overflow-y-auto space-y-8 custom-scrollbar">
-                        {/* Templates Row */}
+                        {/* 2. Templates */}
                         <div>
-                            {/* Saved Templates */}
                             {savedTemplates.length > 0 && (
                                 <div className="mb-4">
                                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 block">{t('wm_myTemplates')}</label>
@@ -645,7 +634,6 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
 
                             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 block">{t('wm_systemTemplates')}</label>
                             <div className="grid grid-cols-4 gap-3">
-                                 {/* Original 4 */}
                                  <button onClick={() => applyPreset('yin-square')} className="group p-2 border rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all flex flex-col items-center gap-2">
                                      <div className="w-8 h-8 rounded bg-red-700 shadow-sm group-hover:scale-110 transition-transform"></div>
                                      <span className="text-[10px] text-gray-600 font-medium">陰刻方</span>
@@ -663,7 +651,6 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
                                      <span className="text-[10px] text-gray-600 font-medium">手寫</span>
                                  </button>
                                  
-                                 {/* New 4 */}
                                  <button onClick={() => applyPreset('classic-round')} className="group p-2 border rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all flex flex-col items-center gap-2">
                                      <div className="w-8 h-8 rounded-full border-2 border-red-800 shadow-sm group-hover:scale-110 transition-transform"></div>
                                      <span className="text-[10px] text-gray-600 font-medium">古典圓章</span>
@@ -683,128 +670,131 @@ export const WatermarkModal: React.FC<WatermarkModalProps> = ({ onClose, onUseIm
                             </div>
                         </div>
 
-                        {/* Layout & Direction */}
-                        <div className="grid grid-cols-2 gap-2">
-                            <div>
-                                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">{t('watermarkLayoutLabel')}</label>
-                                 <div className="flex bg-gray-100 rounded-lg p-1">
-                                     <button onClick={() => setLayout('grid')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${layout === 'grid' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{t('layoutGrid')}</button>
-                                     <button onClick={() => setLayout('single')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${layout === 'single' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{t('layoutSingle')}</button>
-                                 </div>
-                            </div>
-                            <div>
-                                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">{t('watermarkDirectionLabel')}</label>
-                                 <div className="flex bg-gray-100 rounded-lg p-1">
-                                     <button onClick={() => setDirection('vertical')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${direction === 'vertical' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{t('dirVertical')}</button>
-                                     <button onClick={() => setDirection('horizontal')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${direction === 'horizontal' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{t('dirHorizontal')}</button>
-                                 </div>
-                            </div>
-                        </div>
-
-                        {/* Font & Color */}
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">字型</label>
-                                <select 
-                                    value={font} 
-                                    onChange={(e) => setFont(e.target.value)}
-                                    className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none"
-                                >
-                                    {FONTS.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">顏色</label>
-                                <div className="flex flex-wrap gap-3 items-center">
-                                    {PRESET_COLORS.map(c => (
-                                        <button
-                                            key={c}
-                                            onClick={() => setColor(c)}
-                                            className={`w-8 h-8 rounded-full shadow-sm transition-transform transform hover:scale-110 ${color === c ? 'ring-2 ring-offset-2 ring-purple-500' : ''}`}
-                                            style={{ backgroundColor: c, border: c === '#FFFFFF' ? '1px solid #e5e7eb' : 'none' }}
-                                        />
-                                    ))}
-                                    <div className="relative w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center overflow-hidden bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 cursor-pointer hover:opacity-90">
-                                        <input 
-                                            type="color" 
-                                            value={color} 
-                                            onChange={e => setColor(e.target.value)} 
-                                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Sliders */}
-                        <div className="space-y-5 pt-2">
-                             {[
-                                 { label: t('watermarkWidthLabel'), val: width, set: setWidth, min: 50, max: 800, unit: 'px' },
-                                 { label: t('watermarkHeightLabel'), val: height, set: setHeight, min: 50, max: 800, unit: 'px' },
-                                 { label: t('watermarkSizeLabel'), val: fontSizePercent, set: setFontSizePercent, min: 20, max: 150, unit: '%' },
-                                 { label: t('watermarkSpaceLabel'), val: spacing, set: setSpacing, min: -20, max: 50, unit: 'px' },
-                                 { label: t('watermarkNoiseLabel'), val: noise, set: setNoise, min: 0, max: 100, unit: '%' },
-                             ].map((slider, idx) => (
-                                 <div key={idx} className="group">
-                                     <div className="flex justify-between mb-1.5 items-center">
-                                         <span className="text-xs font-medium text-gray-600">{slider.label}</span>
-                                         <div className="flex items-center gap-1">
-                                             <input 
-                                                type="number" 
-                                                value={slider.val} 
-                                                onChange={(e) => slider.set(Number(e.target.value))}
-                                                className="w-12 text-xs bg-gray-100 border border-gray-300 rounded px-1 py-0.5 text-right focus:outline-none focus:border-purple-500 text-gray-900 font-bold"
-                                             />
-                                             <span className="text-xs text-gray-400 font-mono w-4">{slider.unit}</span>
-                                         </div>
+                        {/* 3. Controls (Font, Color, Sliders) */}
+                        <div className="space-y-6">
+                            {/* Layout & Direction */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">{t('watermarkLayoutLabel')}</label>
+                                     <div className="flex bg-gray-100 rounded-lg p-1">
+                                         <button onClick={() => setLayout('grid')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${layout === 'grid' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{t('layoutGrid')}</button>
+                                         <button onClick={() => setLayout('single')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${layout === 'single' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{t('layoutSingle')}</button>
                                      </div>
-                                     <input 
-                                        type="range" 
-                                        min={slider.min} max={slider.max} 
-                                        value={slider.val} 
-                                        onChange={e => slider.set(Number(e.target.value))}
-                                        className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600 hover:accent-purple-700"
-                                     />
-                                 </div>
-                             ))}
-                        </div>
-                        
-                        {/* Border Settings */}
-                        {style !== 'signature' && (
-                            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                <div className="flex items-center justify-between mb-2">
-                                     <label className="flex items-center gap-2 cursor-pointer">
-                                         <input type="checkbox" checked={showBorder} onChange={e => setShowBorder(e.target.checked)} className="rounded text-purple-600 focus:ring-purple-500" />
-                                         <span className="text-sm text-gray-700 font-medium">{t('watermarkBorderLabel')}</span>
-                                     </label>
                                 </div>
-                                {showBorder && (
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-xs text-gray-500 whitespace-nowrap">{t('watermarkThicknessLabel')}</span>
-                                        <input 
-                                            type="range" 
-                                            min="1" max="20" 
-                                            value={borderThickness} 
-                                            onChange={e => setBorderThickness(Number(e.target.value))} 
-                                            className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
-                                        />
-                                        <div className="flex items-center gap-1">
-                                             <input 
-                                                type="number" 
-                                                value={borderThickness} 
-                                                onChange={(e) => setBorderThickness(Number(e.target.value))}
-                                                className="w-10 text-xs bg-gray-100 border border-gray-300 rounded px-1 py-0.5 text-right focus:outline-none focus:border-purple-500 text-gray-900 font-bold"
-                                             />
+                                <div>
+                                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">{t('watermarkDirectionLabel')}</label>
+                                     <div className="flex bg-gray-100 rounded-lg p-1">
+                                         <button onClick={() => setDirection('vertical')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${direction === 'vertical' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{t('dirVertical')}</button>
+                                         <button onClick={() => setDirection('horizontal')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${direction === 'horizontal' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{t('dirHorizontal')}</button>
+                                     </div>
+                                </div>
+                            </div>
+
+                            {/* Font & Color */}
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">字型</label>
+                                    <select 
+                                        value={font} 
+                                        onChange={(e) => setFont(e.target.value)}
+                                        className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none"
+                                    >
+                                        {FONTS.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">顏色</label>
+                                    <div className="flex flex-wrap gap-3 items-center">
+                                        {PRESET_COLORS.map(c => (
+                                            <button
+                                                key={c}
+                                                onClick={() => setColor(c)}
+                                                className={`w-8 h-8 rounded-full shadow-sm transition-transform transform hover:scale-110 ${color === c ? 'ring-2 ring-offset-2 ring-purple-500' : ''}`}
+                                                style={{ backgroundColor: c, border: c === '#FFFFFF' ? '1px solid #e5e7eb' : 'none' }}
+                                            />
+                                        ))}
+                                        <div className="relative w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center overflow-hidden bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 cursor-pointer hover:opacity-90">
+                                            <input 
+                                                type="color" 
+                                                value={color} 
+                                                onChange={e => setColor(e.target.value)} 
+                                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                            />
                                         </div>
                                     </div>
-                                )}
+                                </div>
                             </div>
-                        )}
 
+                            {/* Sliders */}
+                            <div className="space-y-5">
+                                {[
+                                    { label: t('watermarkWidthLabel'), val: width, set: setWidth, min: 50, max: 800, unit: 'px' },
+                                    { label: t('watermarkHeightLabel'), val: height, set: setHeight, min: 50, max: 800, unit: 'px' },
+                                    { label: t('watermarkSizeLabel'), val: fontSizePercent, set: setFontSizePercent, min: 20, max: 150, unit: '%' },
+                                    { label: t('watermarkSpaceLabel'), val: spacing, set: setSpacing, min: -20, max: 50, unit: 'px' },
+                                    { label: t('watermarkNoiseLabel'), val: noise, set: setNoise, min: 0, max: 100, unit: '%' },
+                                ].map((slider, idx) => (
+                                    <div key={idx} className="group">
+                                        <div className="flex justify-between mb-1.5 items-center">
+                                            <span className="text-xs font-medium text-gray-600">{slider.label}</span>
+                                            <div className="flex items-center gap-1">
+                                                <input 
+                                                    type="number" 
+                                                    value={slider.val} 
+                                                    onChange={(e) => slider.set(Number(e.target.value))}
+                                                    className="w-12 text-xs bg-gray-100 border border-gray-300 rounded px-1 py-0.5 text-right focus:outline-none focus:border-purple-500 text-gray-900 font-bold"
+                                                />
+                                                <span className="text-xs text-gray-400 font-mono w-4">{slider.unit}</span>
+                                            </div>
+                                        </div>
+                                        <input 
+                                            type="range" 
+                                            min={slider.min} max={slider.max} 
+                                            value={slider.val} 
+                                            onChange={e => slider.set(Number(e.target.value))}
+                                            className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600 hover:accent-purple-700"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            {/* Border Settings */}
+                            {style !== 'signature' && (
+                                <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input type="checkbox" checked={showBorder} onChange={e => setShowBorder(e.target.checked)} className="rounded text-purple-600 focus:ring-purple-500" />
+                                            <span className="text-sm text-gray-700 font-medium">{t('watermarkBorderLabel')}</span>
+                                        </label>
+                                    </div>
+                                    {showBorder && (
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-xs text-gray-500 whitespace-nowrap">{t('watermarkThicknessLabel')}</span>
+                                            <input 
+                                                type="range" 
+                                                min="1" max="20" 
+                                                value={borderThickness} 
+                                                onChange={e => setBorderThickness(Number(e.target.value))} 
+                                                className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                                            />
+                                            <div className="flex items-center gap-1">
+                                                <input 
+                                                    type="number" 
+                                                    value={borderThickness} 
+                                                    onChange={(e) => setBorderThickness(Number(e.target.value))}
+                                                    className="w-10 text-xs bg-gray-100 border border-gray-300 rounded px-1 py-0.5 text-right focus:outline-none focus:border-purple-500 text-gray-900 font-bold"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                     
-                    <div className="p-5 bg-white border-t border-gray-200 flex gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                    {/* Footer Buttons */}
+                    <div className="p-5 bg-white border-t border-gray-200 flex gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] mt-auto flex-shrink-0">
                          <button onClick={handleDownload} className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors flex justify-center items-center gap-2 border border-gray-300">
                              <DownloadIcon className="w-5 h-5"/> {t('downloadButton')}
                          </button>
