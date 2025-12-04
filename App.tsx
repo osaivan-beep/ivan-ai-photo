@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { GenerateContentResponse } from '@google/genai';
 import { CanvasEditor, type CanvasEditorRef } from './components/CanvasEditor';
@@ -542,17 +535,49 @@ const App: React.FC = () => {
         const result = await generateImageWithGemini(prompt, effectiveAspectRatio);
         resultImageUrl = result.imageUrl;
       } else {
-        let baseImagePart: GeminiImagePart;
+        // Image Editing / Image to Image
+        // Construct the multi-image payload
+        const imagesToSend: GeminiImagePart[] = [];
+
+        // Prepare active image data (the one being edited/viewed)
+        let activeImageData = '';
+        let activeImageMime = 'image/png';
+
         if (previousResultUrl) {
-            const [header, base64Data] = previousResultUrl.split(',');
-            baseImagePart = { base64Data, mimeType: header.match(/:(.*?);/)?.[1] || 'image/png' };
+             const parts = previousResultUrl.split(',');
+             activeImageData = parts[1];
+             activeImageMime = parts[0].match(/:(.*?);/)?.[1] || 'image/png';
+        } else if (capturedCanvasData) {
+             const parts = capturedCanvasData.split(',');
+             activeImageData = parts[1];
+             activeImageMime = parts[0].match(/:(.*?);/)?.[1] || 'image/png';
         } else {
-            if (!capturedCanvasData) throw new Error('Canvas data missing.');
-            const base64Data = capturedCanvasData.split(',')[1];
-            baseImagePart = { base64Data, mimeType: 'image/png' };
+             // Fallback safety
+             throw new Error('Image data missing.');
         }
-        
-        const imagesToSend: GeminiImagePart[] = [baseImagePart];
+
+        // We iterate through uploadedImages to maintain order (Image 1, Image 2...)
+        // But for the *selected* image, we use the active edited state (activeImageData)
+        if (uploadedImages.length > 0) {
+            uploadedImages.forEach(img => {
+                if (img.id === selectedImageId) {
+                    imagesToSend.push({ 
+                        base64Data: activeImageData, 
+                        mimeType: activeImageMime 
+                    });
+                } else {
+                    const parts = img.dataUrl.split(',');
+                    imagesToSend.push({ 
+                        base64Data: parts[1], 
+                        mimeType: parts[0].match(/:(.*?);/)?.[1] || 'image/png' 
+                    });
+                }
+            });
+        } else {
+             // Should not happen if selectedImage is true, but safe fallback
+             imagesToSend.push({ base64Data: activeImageData, mimeType: activeImageMime });
+        }
+
         const editPrefix = "Edit instruction: ";
         const finalPrompt = `${editPrefix}${prompt}\n\n${t('instructionalPrompt')}`;
         
