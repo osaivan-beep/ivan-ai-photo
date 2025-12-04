@@ -3,6 +3,8 @@
 
 
 
+
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { GenerateContentResponse } from '@google/genai';
 import { CanvasEditor, type CanvasEditorRef } from './components/CanvasEditor';
@@ -819,6 +821,7 @@ const App: React.FC = () => {
                     apiResult={apiResult}
                     t={t}
                     onEditResult={handleEditResult}
+                    onUpdateResult={(url) => setApiResult(prev => ({ ...prev, imageUrl: url }))}
                     originalImageSrc={selectedImage?.dataUrl || null}
                  />
             ) : (
