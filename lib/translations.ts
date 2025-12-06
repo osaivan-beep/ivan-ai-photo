@@ -2,6 +2,7 @@
 
 
 
+
 const zhBirdsPrompts = [
     "圖1的鳥站在圖2的樹藤上 樹藤底下裸空",
     "圖1與圖2的鳥,是一對恩愛情侶,頭上羽毛澎起,站在圖3的樹藤上",
@@ -265,7 +266,7 @@ export const translations = {
     applyCropButton: "Apply",
     textLabel: "Text",
     addTextButton: "Add Text",
-    addWatermarkButton: "Add Logo",
+    addWatermarkButton: "Add Watermark",
     textInputLabel: "Content",
     fontLabel: "Font",
     fontSizeLabel: "Size",
@@ -471,6 +472,11 @@ export const translations = {
     // Upscale
     upscale2xButton: "2x Smart Upscale",
     upscalingState: "Upscaling...",
+    // Admin Create User
+    adminCreateUserButton: "Add User",
+    adminCreateUserTitle: "Create New User",
+    createUserButton: "Create",
+    adminCreateUserSuccess: "User created!",
   },
   zh: {
     title: "伊凡 Ai photo",
@@ -525,7 +531,7 @@ export const translations = {
     vibranceLabel: "鮮豔度",
     temperatureLabel: "色溫",
     tintLabel: "色調",
-    clarityLabel: "結構",
+    clarityLabel: "清晰度", // Updated
     dehazeLabel: "去霧",
     blurLabel: "模糊",
     colorMixerLabel: "混色器",
@@ -565,7 +571,7 @@ export const translations = {
     applyCropButton: "應用",
     textLabel: "文字",
     addTextButton: "新增文字",
-    addWatermarkButton: "新增 Logo",
+    addWatermarkButton: "新增浮水印", // Updated
     textInputLabel: "內容",
     fontLabel: "字型",
     fontSizeLabel: "大小",
@@ -760,8 +766,12 @@ export const translations = {
     vp_cam_follow: "準確跟隨主題 (Subject Follow)",
     vp_cam_orbit_in: "環繞主題並拉近 (Orbit & Zoom In)",
     vp_cam_orbit_out: "環繞主題並拉遠 (Orbit & Zoom Out)",
-    // Upscale
     upscale2xButton: "2x 智慧放大",
     upscalingState: "放大處理中...",
+    // Admin Create User
+    adminCreateUserButton: "新增用戶",
+    adminCreateUserTitle: "建立新帳號",
+    createUserButton: "建立帳戶",
+    adminCreateUserSuccess: "用戶建立成功！",
   }
 };

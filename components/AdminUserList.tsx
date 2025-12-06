@@ -1,8 +1,8 @@
 
 import React, { useEffect, useState } from 'react';
-import { getAllUsers, updateCreditsByUid } from '../services/firebaseService';
+import { getAllUsers, updateCreditsByUid, adminCreateUser } from '../services/firebaseService';
 import type { UserProfile, TFunction } from '../types';
-import { RefreshIcon, SearchIcon, SparklesIcon } from './Icons';
+import { RefreshIcon, SearchIcon, SparklesIcon, PlusIcon, CloseIcon } from './Icons';
 
 interface AdminUserListProps {
     t: TFunction;
@@ -14,6 +14,12 @@ export const AdminUserList: React.FC<AdminUserListProps> = ({ t, onCreditsUpdate
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [processingUid, setProcessingUid] = useState<string | null>(null);
+    
+    // Create User Modal State
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [newEmail, setNewEmail] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [isCreating, setIsCreating] = useState(false);
 
     const loadUsers = async () => {
         setLoading(true);
@@ -49,6 +55,28 @@ export const AdminUserList: React.FC<AdminUserListProps> = ({ t, onCreditsUpdate
         }
     };
 
+    const handleCreateUser = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newPassword.length < 6) {
+            alert("Password must be at least 6 characters.");
+            return;
+        }
+        setIsCreating(true);
+        try {
+            await adminCreateUser(newEmail, newPassword);
+            alert(t('adminCreateUserSuccess'));
+            setIsCreateModalOpen(false);
+            setNewEmail('');
+            setNewPassword('');
+            loadUsers(); // Refresh list
+        } catch (error: any) {
+            console.error(error);
+            alert("Error creating user: " + error.message);
+        } finally {
+            setIsCreating(false);
+        }
+    };
+
     const filteredUsers = users.filter(u => 
         (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -71,6 +99,14 @@ export const AdminUserList: React.FC<AdminUserListProps> = ({ t, onCreditsUpdate
                             className="w-full sm:w-64 bg-gray-900 border border-gray-600 rounded-lg pl-8 pr-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-purple-500"
                         />
                     </div>
+                    <button 
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="p-2 bg-green-600 hover:bg-green-700 rounded-lg text-white font-bold flex items-center gap-1 text-xs" 
+                        title={t('adminCreateUserButton')}
+                    >
+                        <PlusIcon className="w-4 h-4" />
+                        <span className="hidden sm:inline">{t('adminCreateUserButton')}</span>
+                    </button>
                     <button 
                         onClick={loadUsers} 
                         className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300" 
@@ -146,6 +182,45 @@ export const AdminUserList: React.FC<AdminUserListProps> = ({ t, onCreditsUpdate
                     </tbody>
                 </table>
             </div>
+
+            {/* Create User Modal */}
+            {isCreateModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div className="bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm border border-gray-700 p-6 animate-fade-in">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-bold text-white">{t('adminCreateUserTitle')}</h3>
+                            <button onClick={() => setIsCreateModalOpen(false)}><CloseIcon className="w-6 h-6 text-gray-400 hover:text-white" /></button>
+                        </div>
+                        <form onSubmit={handleCreateUser} className="space-y-4">
+                            <div>
+                                <label className="block text-gray-400 text-sm mb-1">Email</label>
+                                <input 
+                                    type="email" required
+                                    className="w-full bg-gray-900 text-white p-2 rounded border border-gray-600 focus:border-purple-500 outline-none"
+                                    value={newEmail}
+                                    onChange={e => setNewEmail(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-gray-400 text-sm mb-1">Password</label>
+                                <input 
+                                    type="password" required minLength={6}
+                                    className="w-full bg-gray-900 text-white p-2 rounded border border-gray-600 focus:border-purple-500 outline-none"
+                                    value={newPassword}
+                                    onChange={e => setNewPassword(e.target.value)}
+                                />
+                            </div>
+                            <button 
+                                type="submit" 
+                                disabled={isCreating}
+                                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg disabled:opacity-50 transition-colors"
+                            >
+                                {isCreating ? 'Creating...' : t('createUserButton')}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -1,5 +1,5 @@
 
-import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
+import { initializeApp, getApps, getApp, deleteApp, type FirebaseApp } from 'firebase/app';
 import { 
     getAuth, 
     signInWithEmailAndPassword, 
@@ -130,6 +130,41 @@ export const register = async (email: string, pass: string) => {
         credits: 20
     });
     return userCredential;
+};
+
+// NEW: Function for Admin to create users without logging out
+export const adminCreateUser = async (email: string, pass: string) => {
+    if (!db) throw new Error("Firebase not initialized");
+    
+    // We need the config to initialize a secondary app
+    let config: FirebaseConfig | null = embeddedConfig;
+    if (!config) {
+        const stored = localStorage.getItem('firebaseConfig');
+        if (stored) config = JSON.parse(stored);
+    }
+    
+    if (!config) throw new Error("Firebase config not found");
+
+    // Initialize a secondary app instance
+    // This allows us to create a user without signing out the current admin
+    const secondaryApp = initializeApp(config as any, "SecondaryApp");
+    const secondaryAuth = getAuth(secondaryApp);
+
+    try {
+        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, pass);
+        // Create the user document in the MAIN database (using the admin's 'db' instance which is already auth'd)
+        await setDoc(doc(db, "users", userCredential.user.uid), {
+            email: email,
+            credits: 20
+        });
+        
+        // Sign out from the secondary app just in case
+        await signOut(secondaryAuth);
+        return userCredential;
+    } finally {
+        // Clean up the secondary app
+        await deleteApp(secondaryApp);
+    }
 };
 
 export const logout = async () => {
