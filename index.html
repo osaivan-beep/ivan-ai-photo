@@ -1,0 +1,97 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer-when-downgrade" />
+    <title>伊凡 Ai photo</title>
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Amatic+SC:wght@400;700&family=Caveat&family=Courgette&family=Dancing+Script:wght@400;700&family=Great+Vibes&family=Indie+Flower&family=Kalam&family=Liu+Jian+Mao+Cao&family=Lobster&family=Long+Cang&family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@400;700&family=Noto+Serif+SC:wght@400;700&family=Pacifico&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Roboto:wght@400;700&family=Sacramento&family=Shadows+Into+Light&family=ZCOOL+KuaiLe&family=ZCOOL+QingKe+HuangYou&family=ZCOOL+XiaoWei&family=Zhi+Mang+Xing&family=KaiTi&display=swap" rel="stylesheet">
+    <meta name="theme-color" content="#111827" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        background-color: #111827; /* bg-gray-900 */
+      }
+      /* Custom Scrollbar for dark theme */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #1f2937; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #4b5563; 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #6b7280; 
+      }
+
+      /* Tech Flicker Animation */
+      @keyframes tech-flicker {
+        0%, 19.999%, 22%, 62.999%, 64%, 100% {
+          opacity: 1;
+          text-shadow: 0 0 8px rgba(34, 211, 238, 0.8), 0 0 16px rgba(168, 85, 247, 0.4);
+        }
+        20%, 21.999%, 63%, 63.999% {
+          opacity: 0.4;
+          text-shadow: none;
+        }
+      }
+      .animate-tech-flicker {
+        animation: tech-flicker 3s infinite;
+      }
+      .glow-text-cyan {
+        text-shadow: 0 0 10px rgba(34, 211, 238, 0.6);
+      }
+      
+      /* New Workshop Animation for Button Pulse */
+      @keyframes workshop-pulse {
+        0%, 100% { box-shadow: 0 0 15px rgba(34, 211, 238, 0.2); }
+        50% { box-shadow: 0 0 30px rgba(34, 211, 238, 0.4); }
+      }
+      .animate-workshop-pulse {
+        animation: workshop-pulse 2s infinite;
+      }
+      
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+      }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "vite": "https://aistudiocdn.com/vite@^7.2.4",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "firebase/": "https://aistudiocdn.com/firebase@^12.6.0/",
+    "firebase-functions/": "https://esm.sh/firebase-functions@^7.0.1/",
+    "firebase-admin/": "https://esm.sh/firebase-admin@^13.6.0/",
+    "firebase-admin": "https://esm.sh/firebase-admin@^13.6.0",
+    "firebase-functions": "https://esm.sh/firebase-functions@^7.0.1"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
