@@ -1,0 +1,32 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 管理員專屬判定：Email 匹配 OR 截圖中的 UID 匹配
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.email == 'osa.ivan@gmail.com' || 
+        request.auth.uid == 'CKECNr8nTGTWW9mCVvg99RMgNhl1'
+      );
+    }
+
+    match /users/{userId} {
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      // 修正處：允許管理員幫別人建立文件
+      allow create: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+      allow update: if request.auth != null && (
+        isAdmin() ||
+        (request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['credits', 'isAdmin']))
+      );
+    }
+
+    // 帳單日誌：僅管理員可列出與讀取
+    match /usage_logs/{logId} {
+      allow read, list: if isAdmin();
+      allow create: if request.auth != null; // 由 Cloud Functions 觸發寫入
+    }
+  }
+}
